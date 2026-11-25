@@ -1,0 +1,2 @@
+# SPDX-License-Identifier: MIT
+front *engine/ui/front.o *engine/ui/image.o *engine/ui/format.o *plat/n64/ui-image.o *plat/host/ui-image.o

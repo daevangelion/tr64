@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: MIT
+# Text/rodata object selectors; writable state remains resident.
+init *engine/code/init.o
+test *engine/code/test.o

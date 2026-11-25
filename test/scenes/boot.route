@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+# Synthetic platform gate; no game content or game behaviour.
+scene boot
+start boot
+ticks 60
+seed 1
+observe state
+observe boot-card
+observe pools
+observe code
+observe placement
+at 0 pad 0 0 0
+at 20 pad 1 16 -16
+at 40 pad 0 0 0
+expect-state b84a49c7
+expect-shot ca8c4f564fdf9da20b9def239a785a7bed93788cabde8e92f5bf25f68f277ae0

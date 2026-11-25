@@ -1,0 +1,14 @@
+--- a/src/fixed/item.h
++++ b/src/fixed/item.h
+@@ -1250,10 +1250,7 @@
+ 
+     if (room)
+         room->remove(this);
+-    if (collected)
+-        room = rooms + record.roomIndex;
+-    else
+-        rooms[record.roomIndex].add(this);
++    rooms[record.roomIndex].add(this);
+ 
+     pos.x       = record.x + (room->info->x << 8);
+     pos.y       = record.y + room->info->yTop;

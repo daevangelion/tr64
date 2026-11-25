@@ -1,0 +1,62 @@
+--- a/ares/n64/cpu/cpu.hpp
++++ b/ares/n64/cpu/cpu.hpp
+@@ -299,6 +299,12 @@
+   template<u32 Dir, u32 Size> auto devirtualize(u64 vaddr, bool raiseAlignedError = true, bool raiseExceptions = true) -> PhysAccess;
+   auto devirtualizeDebug(u64 vaddr) -> u64;
+ 
++  //tools/ares/hw-likeness.patch: set at power-on from ARES_HW_LIKE (comma list)
++  struct {
++    bool fetchUnmapped = false;       //fetch: kernel-mapped PC with bits 63:60 >= 8 is not translated
++    bool icachePhysicalIndex = false; //icache: Hit_Invalidate_I indexes by the translated address, no tag compare
++  } hw;
++
+   auto fetch(PhysAccess access) -> maybe<u32>;
+   auto jitFetch(u64 vaddr, u32 addr) -> void {
+     icache.jitFetch(vaddr, addr, *this);
+--- a/ares/n64/cpu/cpu.cpp
++++ b/ares/n64/cpu/cpu.cpp
+@@ -107,7 +107,15 @@
+     return;
+   }
+ 
+-  auto access = devirtualize<Read, Word>(ipu.pc);
++  //ARES_HW_LIKE=fetch: a core that treats a sign-extended kernel-mapped PC (bits 63:60 >= 8)
++  //as unmapped, physical address = low 29 bits, uncached, whatever the TLB holds.
++  PhysAccess access;
++  if(unlikely(hw.fetchUnmapped) && context.bits == 64 && ipu.pc >> 60 >= 8 && segment(ipu.pc) == Context::Segment::Mapped) {
++    if(vaddrAlignedError<Word>(ipu.pc, false)) return;
++    access = PhysAccess{true, false, (u32)ipu.pc & 0x1fff'ffff, ipu.pc};
++  } else {
++    access = devirtualize<Read, Word>(ipu.pc);
++  }
+   if(!access) return;
+ 
+   if(Accuracy::CPU::Recompiler && recompiler.enabled && access.cache) {
+@@ -140,6 +148,13 @@
+ }
+ 
+ auto CPU::power(bool reset) -> void {
++  //hardware likeness (tools/ares/hw-likeness.patch): ARES_HW_LIKE is a comma list of
++  //`fetch` and `icache`; unset or empty leaves ares exactly as it was.
++  {
++    const char* like = getenv("ARES_HW_LIKE");
++    hw.fetchUnmapped = like && strstr(like, "fetch");
++    hw.icachePhysicalIndex = like && strstr(like, "icache");
++  }
+   Thread::reset();
+ 
+   context.endian = Context::Endian::Big;
+--- a/ares/n64/cpu/interpreter-ipu.cpp
++++ b/ares/n64/cpu/interpreter-ipu.cpp
+@@ -149,6 +149,11 @@
+   }
+ 
+   case 0x10: {  //icache hit invalidate
++    if(unlikely(hw.icachePhysicalIndex)) {
++      //ARES_HW_LIKE=icache: the line at the translated address's index goes, tag or not
++      icache.line(access.paddr).valid = 0;
++      break;
++    }
+     auto& line = icache.line(access.vaddr);
+     if(line.hit(access.paddr)) line.valid = 0;
+     break;

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT
+# Same inputs/placement as m3-level1-bridges-live; no gameplay-hash claim.
+scene snd-bridge-perf
+start boot
+load level level1
+game
+place 13 31232 4352 48640 -8192
+ticks 180
+seed 1
+at 0 pad 256 0 0
+at 1 pad 8 0 0
+at 80 pad 136 0 0
+observe log "scene-work: .* room=14"
+observe pools
+observe placement

@@ -1,0 +1,9 @@
+{
+  "level": "LEVEL1",
+  "rest_items": 65535,
+  "camera": {
+    "room": 27,
+    "position": [7500, 8400, 82500],
+    "target": [9000, 8650, 85500]
+  }
+}

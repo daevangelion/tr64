@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Production assets, one game tick/frame per playable level, asset-only TITLE.
+scene campaign-bind
+start boot
+load level title
+probe reload
+ticks 2
+seed 1
+observe log "^campaign-bind PASS loads=17 ticks=16 frames=16 title_asset_only=1 releases=17$"
+observe pools
+observe placement

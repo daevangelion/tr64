@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: MIT */
+/* TR2 4 MiB rows, in the same order and format as pools.def.
+ * Level: largest measured PC pack (MONASTRY, 2056160 B), plus at
+ * least 32 KiB, rounded up to preserve the 8 KiB cache phase.
+ * State: provisional census allowance for gameplay, not measured.
+ * Total: 4026 KiB; reserve: 70 KiB. See docs/tr2-level-fit.md. */
+TR64_POOL(image,     608, IMAGE)
+TR64_POOL(stack,      64, FIXED)
+TR64_POOL(fb,        300, FIXED)
+TR64_POOL(zbuf,      150, FIXED)
+TR64_POOL(code,       96, CARVE)
+TR64_POOL(gpu,       232, CARVE)
+TR64_POOL(audio,     128, CARVE)
+TR64_POOL(libheap,    64, CARVE)
+TR64_POOL(level,    2040, CARVE)
+TR64_POOL(state,     296, CARVE)
+TR64_POOL(io,         48, CARVE)

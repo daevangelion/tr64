@@ -1,0 +1,217 @@
+{
+  "policy": "Exact missing TR2 semantics, not a mask for numeric disagreements. Remove an excluded path only when its implementation lands; add that commit to retired in the same change.",
+  "retired": {},
+  "common": {
+    "lara.timer": [0, null],
+    "lara.flareAge": [0, null],
+    "lara.flareFrame": [0, null],
+    "lara.flareLeft": [0, null],
+    "lara.flareRight": [0, null],
+    "lara.climbing": [0, null],
+    "lara.vehicle": [0, null],
+    "lara.weaponItem": [0, null],
+    "lara.target": [0, null],
+    "camera.pos": [0, null],
+    "camera.target": [0, null],
+    "camera.room": [0, null],
+    "camera.targetRoom": [0, null],
+    "camera.targetDist": [0, null],
+    "camera.targetAngle": [0, null],
+    "camera.angle": [0, null],
+    "camera.targetElevation": [0, null],
+    "camera.speed": [0, null],
+    "camera.timer": [0, null],
+    "camera.index": [0, null],
+    "camera.lastIndex": [0, null],
+    "camera.bounce": [0, null],
+    "camera.mode": [0, null],
+    "camera.lastFixed": [0, null],
+    "save.ammoHits": [0, null]
+  },
+  "producerParent": {
+    "tr64-tr2-camera": "tr64-tr2-items",
+    "tr64-tr2-arms": "tr64-tr2-camera",
+    "tr64-tr2-climb": "tr64-tr2-arms",
+    "tr64-tr2-water": "tr64-tr2-climb",
+    "tr64-tr2-wet-camera": "tr64-tr2-water",
+    "tr64-tr2-combat-camera": "tr64-tr2-wet-camera",
+    "tr64-tr2-interact": "tr64-tr2-combat-camera",
+    "tr64-tr2-interact-v2": "tr64-tr2-interact",
+    "tr64-tr2-combat20": "tr64-tr2-combat-camera",
+    "tr64-tr2-combat": "tr64-tr2-combat20",
+    "tr64-tr2-great-wall20": "tr64-tr2-interact-v2",
+    "tr64-tr2-great-wall21": "tr64-tr2-combat",
+    "tr64-tr2-shotgun-rex20-v2": "tr64-tr2-great-wall20",
+    "tr64-tr2-shotgun-rex-v2": "tr64-tr2-great-wall21",
+    "tr64-tr2-venice-boot": "tr64-tr2-shotgun-rex-v2",
+    "tr64-tr2-venice-boat": "tr64-tr2-venice-boot"
+  },
+  "producerNowAvailable": {
+    "tr64-tr2-camera": ["camera"],
+    "tr64-tr2-arms": ["lara.flareAge", "lara.flareFrame", "lara.flareLeft", "lara.flareRight", "lara.target"],
+    "tr64-tr2-climb": ["lara.climbing"],
+    "tr64-tr2-interact-v2": ["active[type=106].hitMask", "active[type=107].hitMask"],
+    "tr64-tr2-combat20": ["save.ammoHits", "active[type=39,afterWake]"],
+    "tr64-tr2-great-wall20": ["save.ammoHits", "active[type=39,afterWake]"],
+    "tr64-tr2-great-wall21": ["active[type=106].hitMask", "active[type=107].hitMask"],
+    "tr64-tr2-shotgun-rex20-v2": ["lara.weaponItem"],
+    "tr64-tr2-shotgun-rex-v2": ["lara.weaponItem"],
+    "tr64-tr2-venice-boat": ["lara.vehicle"]
+  },
+  "routeCoverage": {
+    "tr64-tr2-camera": {
+      "fall-damage": {"traceSHA256": "a847d9e121592b2d3f53cdb2f3d1e38d1d13138d01e667a9d0f9291dffc66344", "camera": [177, null]},
+      "fixed-camera": {"traceSHA256": "b8af57d9b2c24031ce273c47bc34fa654c7ec9ef91f3dfd2bbb83baf6bc92b1a", "camera": [387, null]},
+      "fixed-camera-repeat": {"traceSHA256": "99a0c5f1bd0b3fa1444e97cb77ceec4e4896e69698555b3421775cfda8ad1f25", "camera": [358, null]},
+      "flare": {"traceSHA256": "05be29eb15fcbe5da4851f9d25bfc65cc4b7509563f5a069da84b9630f8ac607", "camera": [126, null]},
+      "flare-held": {"traceSHA256": "bcacef512064b27eb60dcef874a277f8e04a2749464f150dbf3fd0588281d440", "camera": [165, null]},
+      "grab-attempt": {"traceSHA256": "bd561bf388d107393d44f6d31fe5d30cd01c424a66b7a2939b60a1ce9f2c4994", "camera": [251, null]},
+      "hard-landing": {"traceSHA256": "a2c455ef76ebf85053350abef59ec2c2f75207fd52c555ec74bbdbe522b5d897", "camera": [139, null]},
+      "jump": {"traceSHA256": "3f1bea7dbf1cf1e0ce157581ea7cf1fc6b8e7d0b3150d7e1cad7029f8feeb759", "camera": [225, null]},
+      "look": {"traceSHA256": "fb882c71a00bb134b968b5aa4606c4559d3310b333ec0957807d0d636077f663", "camera": [175, "firearms"]},
+      "look-sidestep": {"traceSHA256": "9be42bedf9b1cd0c19cea6c644ba2da1451af08e39f2d775ba2bd376ef7d7cc1", "camera": [211, null]},
+      "movement": {"traceSHA256": "4f8f8138410583258bf1b22e22880eab86991e3803ca49d7ec4f428fc95e7aa3", "camera": [223, null]},
+      "pistols": {"traceSHA256": "dcb4b9ce49ce96d3339927f2af88d317a947d8530dedac428295324f24b2f80d", "camera": [45, "firearms"]},
+      "pool-swim": {"traceSHA256": "1aaaae48edab95d8519304735aa99e3538fca821650d15dedec6a91cb16b2b13", "camera": [463, "water-entry"]},
+      "pool-wade": {"traceSHA256": "f381c9fcd773c7af06b2ecef87d4c9d10b379c0e63bf339747cf967fbfd9466c", "camera": [567, "water-entry"]},
+      "roll": {"traceSHA256": "b4297bffb46418e97b55249f2847c1ed3b530e8133d0cef64eccb7f0001b18f1", "camera": [183, null]},
+      "slide-jump": {"traceSHA256": "d477b9292f196bbc0c842ec7ddb7e850e562a31b0b68a6d5c3b9dd6e9f6bb376", "camera": [143, null]},
+      "slide-jump-backward": {"traceSHA256": "d8d0298cabe5936a37df1c2d9aa03e192986e419ef5306e61762522d6a0fc8e8", "camera": [207, null]},
+      "stand": {"traceSHA256": "ede8884cefd67a14d7daefae106d20e774c76c9531deb2d3de84cf4f396dffb0", "camera": [300, null]},
+      "tiger-cave": {"traceSHA256": "3cd3ce266c03c2f97af2539d226f79049757a7ad73b510a9fc7f0d485f0b04ef", "camera": [463, null]},
+      "travel": {"traceSHA256": "56a3e642936cf0461c452cdbc1d1e1ea64537a57fe8ff7be9f72bbfc3e811592", "camera": [319, null]},
+      "turn": {"traceSHA256": "aebe2aa1d87dc5e119564d30c94820477988b66eec6d8a57133e8481491c3c44", "camera": [177, null]}
+    },
+    "tr64-tr2-arms": {
+      "flare-drop": {"traceSHA256": "f56ebb68eb951fda0f7f401962f8aebd2fc41c58397bb8d1edd3f5da570b33ce", "camera": [146, "firearms"]},
+      "flare-throw": {"traceSHA256": "afbeb55d9cbe8b85bb219a7764bf43a0113eb72c02c13d8e24f0579cdd3c7a3b"},
+      "ladder": {"traceSHA256": "99b3a000907df7f37c6877f66f9f773871d02e1d74812d45ff415145de60c8d6"},
+      "ledge-grab": {"traceSHA256": "803c452a24f7d0b180c66048bcaf9d14f0e7773b8f6cdce963dc6c396599b4e0"},
+      "pickup": {"traceSHA256": "f254a9c6cff4ad59cbf9a63375966e782cf0711c33133ee074e08d580c4d7fca"},
+      "placed-travel": {"traceSHA256": "5c834858428a846d6794a28a12608695c7a0f0177d6a1855e5f0d50518abd03b"},
+      "sidestep-blocked": {"traceSHA256": "bd1be87ca79d4c4138473fc6157e36db3f3932f382a1f66f1daae505d70c2a84"},
+      "switch-door": {"traceSHA256": "9efb48582d4b0b0746522a2e8b9dd85bfc437928b93f5b5cf756b70469fca989"}
+    },
+    "tr64-tr2-water": {
+      "pool-swim": {"traceSHA256": "1aaaae48edab95d8519304735aa99e3538fca821650d15dedec6a91cb16b2b13", "camera": [658, null]},
+      "pool-wade": {"traceSHA256": "f381c9fcd773c7af06b2ecef87d4c9d10b379c0e63bf339747cf967fbfd9466c", "camera": [568, "camera in a wading sidestep: Q-T2C-12"]}
+    },
+    "tr64-tr2-wet-camera": {
+      "pool-wade": {"traceSHA256": "f381c9fcd773c7af06b2ecef87d4c9d10b379c0e63bf339747cf967fbfd9466c", "camera": [839, null]}
+    },
+    "tr64-tr2-combat-camera": {
+      "flare-drop": {"traceSHA256": "f56ebb68eb951fda0f7f401962f8aebd2fc41c58397bb8d1edd3f5da570b33ce", "camera": [420, null]},
+      "ladder-hang-steps": {"traceSHA256": "4c929fc68986b0c642458b4036d793e29c964823913b7dc051146b67b357531a", "camera": [224, null]},
+      "ledge-edge": {"traceSHA256": "831343537594aa7709ce8462d7121f5b2c92e822290e6bace7b3929d61e0a0e7", "camera": [255, null]},
+      "look": {"traceSHA256": "fb882c71a00bb134b968b5aa4606c4559d3310b333ec0957807d0d636077f663", "camera": [351, null]},
+      "pistols": {"traceSHA256": "dcb4b9ce49ce96d3339927f2af88d317a947d8530dedac428295324f24b2f80d", "camera": [115, null]},
+      "pool-exit": {"traceSHA256": "2a0b8427f548a0c0e7539c7dc9901f26726b5759ee234a2d21202efb1b26643a", "camera": [84, null]},
+      "pool-surface": {"traceSHA256": "133045e2774e23b6db2cee7abb43975a8d6eb41bdd76745239a3a68697240bea", "camera": [883, null]},
+      "wade-step": {"traceSHA256": "7af78478d6532f7cee6a3a7bec4634843dc642f8796151ad4d79d086d111fa68", "camera": [165, null]},
+      "wade-wall": {"traceSHA256": "98a0b59a4a5e60393a9a9bd67ca33a2a578dfc61d0350dfe9512003fafbf2f07", "camera": [185, null]}
+    },
+    "tr64-tr2-interact-v2": {
+      "door-closed": {"traceSHA256": "437ad394387406d2bfac282e5ac47259c4d68e9f6e1c7d6476969daef9c78b12"},
+      "door-opening": {"traceSHA256": "f901bcea7d8a7464686683091a99ae8a56a4fed9cadc3fa95fda5c8582ed985c"},
+      "door-reverse-contact": {"traceSHA256": "33d7bf0c55ef6b1ff350eaa569ed7596bff3ff7c7aab58b6defff54d81e0b0c8"},
+      "rusty-key": {"traceSHA256": "4ceb1a70fd88b9ebe2f8d60692a6894665afa756d45dab51891233cc441b0d31"}
+    },
+    "tr64-tr2-great-wall20": {
+      "blade-hit": {"traceSHA256": "25f87237a8e013c4d11919c08b03663677ff39fb8fe7e8aee568248704075546"},
+      "blade-pass": {"traceSHA256": "5f2f7b58037a9920e6195b0b4e3546124a2491804ef84c4f2d60e9124d483f94"},
+      "block-cycle": {"traceSHA256": "f582cd118c1e33f420610f3d5b1b85de7057ba68a462a3ded93347239f046026"},
+      "block-refused": {"traceSHA256": "c7a6db980ec00a22671bbcbfa3f5307fb86d10bf7f5a4dbf85f56761baf04555"},
+      "boulder-hit": {"traceSHA256": "779cfcd7d3f3b0671a3d3cb6e21a0c80c8319e86d0b4e91ce3a0c88cd16aa62d"},
+      "collapse-cross": {"traceSHA256": "ce70f4e4981ca791e8ff77447f4650578a1f1f61ddfe593ffc4c9234847c9c53"},
+      "level-finish": {"traceSHA256": "8fd363a8c8ad1fda4dfd699f38e3fcdeae10d6b40c6f11f97ba1b6525716a55f"},
+      "shotgun-ammo": {"traceSHA256": "28bdf9419cf7dde2c81fc4a51dd5378c753ee7f719ac76a6e3cd68518f3b7315"},
+      "spike-jump": {"traceSHA256": "f6ed8793eebb93f3aae09d6dd5b45571b69e51f4ac624cef64759f6332aea11f"},
+      "spike-walk": {"traceSHA256": "0499a185b6b75a576e55c085a25510b89ae3e80adcfbc1731d4f42b6fa56fda7"},
+      "trapdoor-fall": {"traceSHA256": "662f6dc82ff0a1c9f09e64c676cac2b38bb0308a2e7cebc35cdaf086a7824e23"},
+      "zip-release": {"traceSHA256": "1bac2cae54f6f8fdb183917006e0578eb6cb50cccc4f18a177a373ea5617f5f6"},
+      "zip-stop": {"traceSHA256": "478157cecf6d0f1b56d04504d22003e498185bd11a92dcb2e14ec04d3cbf4bbd"}
+    },
+    "tr64-tr2-combat": {
+      "schema21/crow-bite": {"traceSHA256": "78e97dbb2cf26b43e9b760805d353eb571315d73701d8285e318e4f45703c558"},
+      "schema21/crow-shoot": {"traceSHA256": "fcf0eefca955e4536e2e30f93798a28e0462efeba9a2d1a88c266882da253b81"},
+      "schema21/pool-swim": {"traceSHA256": "6c8814e7e5622d3f21f592883acc41b5bd1a3de6e75df1b3b1a4e513df4217b4"},
+      "schema21/pool-wade": {"traceSHA256": "6f70ff79cd7ee08792486a31a1cf69ad4e48cd0ac19ebe0a7b2364e813ae633e"},
+      "schema21/spider-bite": {"traceSHA256": "ad33315ffdf8f8bddebdfe12b7451836766f3d19683e9073542457ae95385258"},
+      "schema21/spider-shoot": {"traceSHA256": "efa36459e1068d92a4ae619880a9a5fd021c759085c4ac77d9ce7361751315f1"},
+      "schema21/tiger-bite": {"traceSHA256": "450673e627645f9ee2ba1bc4da3bcdf89851d9d6ab061a45cc4b6bbb42d7bd97"},
+      "schema21/tiger-cave": {"traceSHA256": "03b7dd18c3f930a703cfb0a95b4a6457b8c28404af5b58f8958bb2d23ad043d1"},
+      "schema21/tiger-death": {"traceSHA256": "b784acf2475057b6d0a6906e537ec54ea69df5e2e2a9dd5ac81263231433895a"},
+      "schema21/tiger-shoot": {"traceSHA256": "4f8b6feccc29814fac4aa5afd1b1ea80566dce6e34f819f05854bef818f92beb"}
+    },
+    "tr64-tr2-shotgun-rex20-v2": {
+      "shotgun-ammo": {"traceSHA256": "28bdf9419cf7dde2c81fc4a51dd5378c753ee7f719ac76a6e3cd68518f3b7315"},
+      "medipacks": {"traceSHA256": "86e95e4c376a6dc8613d4ad7851b8959a1073ce74cea00aed89ca5ae6c25811c"}
+    },
+    "tr64-tr2-shotgun-rex-v2": {
+      "schema21/shotgun-tiger": {"traceSHA256": "43b04b8b883f8a77111b8b3acbda850ac823a82ce67ffab7cc29203d406d759e"},
+      "schema21/rex-gold": {"traceSHA256": "2f30daa72fbe42dc6a3ea0c2a4cf7ad090670f14d394e8afea2298f933969cfc"},
+      "schema21/rex-mask": {"traceSHA256": "9e7cfe0fdc618dee0686bcaaf57935a1d0af2dcbd8f0d9e784652b625f99f879"}
+    },
+    "tr64-tr2-venice-boot": {
+      "schema22/venice-stand": {"traceSHA256": "c065e8a6b947ab75e435e100aa919e9fc831ca50b013b7fb7208958e781cff39"}
+    },
+    "tr64-tr2-venice-boat": {
+      "schema22/venice-stand": {"traceSHA256": "c065e8a6b947ab75e435e100aa919e9fc831ca50b013b7fb7208958e781cff39"},
+      "schema22/race-threshold": {"traceSHA256": "413b30af9240941f050f49e7f8e08ab716c5b40c146870c12d2fcf4bdc7a4857"},
+      "schema22/race-countdown": {"traceSHA256": "33e8c1d654596104e905261cc6d9e243cf87113776f7f8fdd9344d43f3401070"},
+      "schema22/venice-boat-crash": {"traceSHA256": "04a02f1bda2d05bd652064ed30cf54d1688a743f6eaebd128fd1000959dc66c5"},
+      "schema22/venice-mine-pass": {"traceSHA256": "58cd788490b06448dfeef53d5af25babe36fa94f8e34a16bb527ed244c9e1c17"}
+    }
+  },
+  "producerExtras": {
+    "tr64-tr2-camera": {},
+    "tr64-tr2-dry": {
+      "active": [0, null],
+      "inventory": [0, null],
+      "world[2]": [0, null]
+    },
+    "tr64-tr2-items": {
+      "active[type=39,afterWake].pos": [0, null],
+      "active[type=39,afterWake].rot": [0, null],
+      "active[type=39,afterWake].room": [0, null],
+      "active[type=39,afterWake].anim": [0, null],
+      "active[type=39,afterWake].frame": [0, null],
+      "active[type=39,afterWake].state": [0, null],
+      "active[type=39,afterWake].goal": [0, null],
+      "active[type=39,afterWake].next": [0, null],
+      "active[type=39,afterWake].hSpeed": [0, null],
+      "active[type=39,afterWake].vSpeed": [0, null],
+      "active[type=39,afterWake].roomFloor": [0, null],
+      "active[type=39,afterWake].hitMask": [0, null],
+      "active[type=39,afterWake].gravity": [0, null],
+      "active[type=106].hitMask": [0, null],
+      "active[type=107].hitMask": [0, null]
+    },
+    "tr64-tr2-arms": {},
+    "tr64-tr2-climb": {},
+    "tr64-tr2-water": {},
+    "tr64-tr2-wet-camera": {},
+    "tr64-tr2-combat-camera": {},
+    "tr64-tr2-interact": {},
+    "tr64-tr2-interact-v2": {},
+    "tr64-tr2-combat20": {},
+    "tr64-tr2-combat": {},
+    "tr64-tr2-great-wall20": {},
+    "tr64-tr2-great-wall21": {},
+    "tr64-tr2-shotgun-rex20-v2": {},
+    "tr64-tr2-shotgun-rex-v2": {},
+    "tr64-tr2-venice-boot": {},
+    "tr64-tr2-venice-boat": {},
+    "tr64-tr2-baseline": {
+      "active": [0, null],
+      "inventory": [0, null],
+      "world[2]": [0, null],
+      "lara.lastWeapon": [0, null],
+      "lara.backWeapon": [0, null],
+      "lara.ammo": [0, null],
+      "lara.waterDistance": [0, 0],
+      "camera.lookAtItem": [0, null],
+      "camera.lastItem": [0, null]
+    }
+  }
+}

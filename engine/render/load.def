@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: MIT
+# Core owns the sole load entry; these objects contain only cold text/rodata.
+load *engine/render/geo_load.o *engine/render/bind_load.o *engine/render/load.o
+load *engine/render/texture_load.o

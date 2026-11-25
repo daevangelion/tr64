@@ -1,0 +1,17 @@
+{
+  "level": "LEVEL6",
+  "texture_animation_step": 0,
+  "camera": {
+    "room": 11,
+    "position": [
+      50688,
+      -3584,
+      40960
+    ],
+    "target": [
+      50688,
+      -2048,
+      38912
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+scene save-world-flip
+start boot
+load level level3b
+probe reload
+ticks 2
+seed 1
+observe log "^save-world-flip PASS levels=2 targets=4 equal_header=1 repeated=1 invalid_nonmutation=1$"
+observe pools
+observe placement

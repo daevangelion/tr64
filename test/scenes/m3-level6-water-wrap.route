@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+scene m3-level6-water-wrap
+start boot
+load level level6
+ticks 2
+seed 1
+observe log "^render: pose=m3-level6-water-wrap.scene "
+observe pools
+observe placement

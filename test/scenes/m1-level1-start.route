@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+# Production posed render; camera is m1-level1-start.scene.json.
+scene m1-level1-start
+start boot
+load level level1
+ticks 2
+seed 1
+observe log "^render: pose=m1-level1-start.scene "
+observe pools
+observe placement

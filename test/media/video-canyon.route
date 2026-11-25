@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Whole canyon video, no level resident: decode time, drops, underruns, sync.
+scene video-canyon
+start boot
+load level canyon
+probe video
+ticks 1
+seed 0
+observe log "^video-probe: name=canyon result=1 "
+observe pools
+observe placement

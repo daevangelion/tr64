@@ -1,0 +1,13 @@
+--- a/src/fixed/hazard_ceiling.h
++++ b/src/fixed/hazard_ceiling.h
+@@ -33,9 +33,7 @@
+             !collideBounds(lara, cinfo))
+             return;
+ 
+-        // tr64 oracle: 300 hit points per frame of contact (docs/specs/wall/objects-missing.md 12),
+-        // not 1000 at the first contact.
+-        hazardDamageLara(lara, 300, HAZARD_HIT_CEILING, pos);
++        hazardKillLara(lara, HAZARD_HIT_CEILING, pos);
+     }
+ 
+     virtual void update()

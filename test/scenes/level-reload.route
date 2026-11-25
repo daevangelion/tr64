@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Core/TX lifecycle probe, not a claim of playable game/renderer restart.
+scene level-reload
+start boot
+load level level1
+probe reload
+ticks 2
+seed 1
+observe log "^level-reload PASS loads=3 repeated_hash=[0-9a-f]{8} distinct_gym=[0-9a-f]{8} planners=3$"
+observe pools
+observe placement

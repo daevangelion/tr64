@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Lara plus selected immutable Core placements, first model frames.
+scene m3-level1-items5
+start boot
+load level level1
+game
+place 14 23552 6656 52736 0
+ticks 1
+seed 1
+observe log "^game-render: .* items=5 rest_models=4$"
+observe pools
+observe placement

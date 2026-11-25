@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT
+# Placement from the immutable M2 GYM/underwater-start fixture, not a HUD override.
+scene ui-underwater
+start boot
+load level gym
+game
+ticks 1
+seed 1
+place 14 40448 4608 60928 0
+at 0 pad 0 0 0
+observe pools
+observe placement
+observe log ui:

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+# Test-build clock rebase; the normal boot VM and frame step cross 2^32 us.
+scene clock-wrap
+start boot
+ticks 60
+seed 1
+probe clock-wrap
+observe state
+observe boot-card
+observe pools
+observe code
+observe placement
+observe log '^clock-wrap: start=[0-9a-f]{8} end=[0-9a-f]{8} elapsed_us=[0-9]+ crossed=1$'
+at 0 pad 0 0 0
+at 20 pad 1 16 -16
+at 40 pad 0 0 0
+expect-state b84a49c7
+expect-shot ca8c4f564fdf9da20b9def239a785a7bed93788cabde8e92f5bf25f68f277ae0

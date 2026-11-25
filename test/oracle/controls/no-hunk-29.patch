@@ -1,0 +1,29 @@
+--- a/src/fixed/lara.h
++++ b/src/fixed/lara.h
+@@ -3109,11 +3109,22 @@
+ 
+             case WATER_STATE_UNDER:
+             {
+-                // Restored: the fork surfaced her here while her room was still a water room, up to 256 units early
+-                // and under a solid water-room ceiling, without the pitch and roll reset. The original leaves UNDER
+-                // only once her room is no longer a water room; the branches below zero pitch and roll.
+-                if (ROOM_FLAG_WATER(room->info->flags) || extraL->dozy)
++                bool inWater = room && ROOM_FLAG_WATER(room->info->flags);
++
++                if (extraL->dozy)
++                    break;
++
++                if (inWater) {
++                    if (waterLevel != WALL && waterDist < 256) {
++                        waterState = WATER_STATE_SURFACE;
++                        pos.y -= (waterDist - 1);
++                        animSet(ANIM_SURF, true);
++                        vSpeed = 0;
++                        extraL->swimTimer = LARA_SWIM_TIMER + 1;
++                        updateRoom(-LARA_HEIGHT / 2);
++                    }
+                     break;
++                }
+ 
+                 if ((getWaterDepth() != WALL) && abs(waterDist) < 256) {
+                     waterState = WATER_STATE_SURFACE;

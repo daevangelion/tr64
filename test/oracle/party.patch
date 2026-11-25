@@ -1,0 +1,1042 @@
+--- a/src/fixed/common.h
++++ b/src/fixed/common.h
+@@ -486,7 +486,7 @@
+ #endif
+ 
+ #define MAX_UPDATE_FRAMES   10
+-#define MAX_PLAYERS         1 // TODO 2 players for non-potato platforms
++#define MAX_PLAYERS         2
+ #define MAX_SPHERES         32
+ #ifndef MAX_MATRICES
+ #define MAX_MATRICES        8
+@@ -1649,6 +1649,8 @@
+     int16 _reserved;
+ 
+     Enemy* enemy;
++    Lara* target;
++    uint32 contact[MAX_PLAYERS];
+ 
+     Nav nav;
+ };
+@@ -2752,6 +2754,17 @@
+ 
+ // renderer internal
+ extern uint32 keys;
++extern Lara* players[MAX_PLAYERS];
++extern uint16 gCoopInput;
++extern Lara* gCoopShooter;
++extern ItemObj* gCoopInteraction[MAX_PLAYERS];
++extern uint16 gCoopPickups[MAX_ITEMS];
++extern unsigned gCoopPickupCount;
++int32 coopSelectedUse(const Lara* lara);
++bool coopClaimBlocked(const Lara* lara,const ItemObj* item);
++void coopClaim(const Lara* lara,ItemObj* item);
++void coopPickup(const Lara* lara,const ItemObj* item);
++uint64_t coopDistanceSquared(const vec3i &a,const vec3i &b);
+ extern RectMinMax viewport;
+ extern vec3i gCameraViewPos;
+ extern Matrix* gMatrixPtr;
+--- a/src/fixed/encounter_spawners.h
++++ b/src/fixed/encounter_spawners.h
+@@ -125,9 +125,9 @@
+         if (!(flags & ITEM_FLAG_REVERSE))
+         {
+             const bool triggered = (flags & ITEM_FLAG_ONCE) != 0;
+-            if (!triggered && players[0] == NULL)
+-                return;
+-            const vec3i &laraPos = players[0] ? players[0]->pos : pos;
++            const Lara* lara=triggered ? NULL : getLara(pos);
++            if (!triggered && !lara)return;
++            const vec3i &laraPos=lara ? lara->pos : pos;
+             if (!encounterSmallPodShouldHatch(triggered, pos, laraPos) ||
+                 !beginPodHatch())
+                 return;
+@@ -450,8 +450,9 @@
+         worldSaveRegressionObserveEncounterUpdate(
+             this, (flags & ITEM_FLAG_REVERSE) != 0);
+ #endif
+-        if ((flags & ITEM_FLAG_REVERSE) || players[0] == NULL ||
+-            !encounterStatueShouldHatch(pos, players[0]->pos))
++        if (flags&ITEM_FLAG_REVERSE)return;
++        const Lara* lara=getLara(pos);
++        if (!lara || !encounterStatueShouldHatch(pos,lara->pos))
+             return;
+         ItemType expectedType = ITEM_LARA;
+         uint16 expectedIndex = ENCOUNTER_CHILD_NONE;
+--- a/src/fixed/enemy.h
++++ b/src/fixed/enemy.h
+@@ -88,6 +88,8 @@
+         }
+ 
+         extra->enemy = this;
++        extra->target=NULL;
++        extra->contact[0]=extra->contact[1]=0;
+         extra->rotHead = extra->rotNeck = 0;
+         extra->maxTurn = 0;
+         extra->nav.stepHeight = 256;
+@@ -122,6 +124,18 @@
+         extraE->nav.init(sector->boxIndex);
+     }
+ 
++    static int32 cameraDistance(const vec3i &pos)
++    {
++        vec3i d=pos-players[0]->extraL->camera.view.pos;
++        int32 distance=X_SQR(d.x>>8)+X_SQR(d.y>>8)+X_SQR(d.z>>8);
++        if (players[1]) {
++            d=pos-players[1]->extraL->camera.view.pos;
++            int32 other=X_SQR(d.x>>8)+X_SQR(d.y>>8)+X_SQR(d.z>>8);
++            if (other<distance)distance=other;
++        }
++        return distance;
++    }
++
+     bool enable(bool forced)
+     {
+         if (extraE)
+@@ -140,30 +154,13 @@
+ 
+         if (index == -1)
+         {
+-            for (int32 i = 0; i < MAX_PLAYERS; i++)
+-            {
+-                if (!players[i])
+-                    continue;
+-
+-                vec3i &viewPos = players[i]->extraL->camera.view.pos;
+-
+-                int32 maxDistQ = 0;
+-
+-                if (!forced)
+-                {
+-                    vec3i d = pos - viewPos;
+-                    maxDistQ = X_SQR(d.x >> 8) + X_SQR(d.y >> 8) + X_SQR(d.z >> 8);
+-                }
+-
+-                for (int32 j = 0; j < MAX_ENEMIES; j++)
+-                {
+-                    vec3i d = enemiesExtra[j].enemy->pos - viewPos;
+-                    int32 distQ = X_SQR(d.x >> 8) + X_SQR(d.y >> 8) + X_SQR(d.z >> 8);
+-                    if (distQ > maxDistQ)
+-                    {
+-                        maxDistQ = distQ;
+-                        index = j;
+-                    }
++            if (!players[0])return false;
++            int32 maxDistQ=forced ? 0 : cameraDistance(pos);
++            for (int32 j=0;j<MAX_ENEMIES;++j) {
++                int32 distQ=cameraDistance(enemiesExtra[j].enemy->pos);
++                if (distQ>maxDistQ) {
++                    maxDistQ=distQ;
++                    index=j;
+                 }
+             }
+         }
+@@ -179,12 +176,19 @@
+     {
+         ASSERT(extraE);
+         extraE->enemy = NULL;
++        extraE->target=NULL;
+         extraE = NULL;
+     }
+ 
+     void updateTargetInfo()
+     {
+-        tinfo.target = getLara(pos);
++        Lara *target=getLara(pos);
++        if (players[1]) {
++            hitMask=extraE->contact[target==players[1]];
++            extraE->contact[0]=extraE->contact[1]=0;
++            if (extraE->target!=target)extraE->nav.nextBox=NO_BOX;
++        }
++        tinfo.target=extraE->target=target;
+ 
+         tinfo.tilt = 0;
+         tinfo.turn = 0;
+@@ -203,7 +207,8 @@
+         tinfo.boxIndex = room->getSector(pos.x, pos.z)->boxIndex;
+         tinfo.boxIndexTarget = tinfo.target->room->getSector(tinfo.target->pos.x, tinfo.target->pos.z)->boxIndex;
+         tinfo.zoneIndex = zones[tinfo.boxIndex];
+-        tinfo.zoneIndexTarget = zones[tinfo.boxIndexTarget];
++        tinfo.zoneIndexTarget = players[1] && tinfo.boxIndexTarget>=level.boxesCount
++            ? NO_BOX : zones[tinfo.boxIndexTarget];
+ 
+         //@TODO blocking
+ 
+@@ -733,7 +738,13 @@
+         if (!extraE) // disabled
+             return;
+ 
+-        if (!updateHitMask(lara, cinfo))
++        const uint32 previous=hitMask;
++        const bool hit=updateHitMask(lara,cinfo);
++        if (players[1]) {
++            extraE->contact[lara==players[1]]=hitMask;
++            hitMask=previous;
++        }
++        if (!hit)
+             return;
+ 
+         if (!cinfo->enemyPush)
+@@ -867,7 +878,9 @@
+ 
+     virtual void hit(int32 damage, const vec3i &point, int32 soundId)
+     {
+-        Lara* lara = getLara(pos);
++        Lara* lara=gCoopShooter;
++        if (!lara && extraE)lara=extraE->target;
++        if (!lara)lara=getLara(pos);
+         if (lara)
+             lara->hit(damage * DAMAGE_SCALE, point, soundId);
+     }
+@@ -926,7 +939,8 @@
+         if (!extraE)
+             return;
+ 
+-        Lara* lara = getLara(pos);
++        Lara* lara=extraE->target;
++        if (!lara)lara=extraE->target=getLara(pos);
+         if (!lara)
+             return;
+ 
+--- a/src/fixed/game.h
++++ b/src/fixed/game.h
+@@ -68,12 +68,14 @@
+ 
+ void completeLevel(ItemObj *lara)
+ {
++    if (players[1] && (gNextLevel!=LVL_MAX || inventory.state!=INV_STATE_NONE))
++        return;
+     LevelID next = tr1CampaignResolveTransition(
+         gLevelID, tr1CampaignNextLevel(gLevelID));
+     if (lara && shouldShowLevelStats(gLevelID, next))
+     {
+         inventory.statsNextLevel = next;
+-        inventory.open(lara, INV_PAGE_STATS);
++        inventory.open(players[1] ? players[0] : lara, INV_PAGE_STATS);
+         return;
+     }
+     nextLevel(next);
+@@ -545,6 +547,93 @@
+     rooms[roomIndex].add(lara);
+ }
+ 
++static void coopClearInteraction(Lara* lara)
++{
++    gCoopInteraction[lara==players[1]]=NULL;
++    FlowState &flow=gFlowState[lara==players[1]];
++    flow.cameraIndex=-1;
++    flow.active=0;
++    if (inventory.lara==lara)
++        inventory.useSlot=SLOT_MAX;
++}
++
++static bool coopJoin()
++{
++    if (!players[0] || players[1] || isCutsceneLevel() ||
++        inventory.state!=INV_STATE_NONE || !ItemObj::sFirstFree)
++        return false;
++    Lara *lead=players[0];
++    players[1]=(Lara*)ItemObj::sFirstFree;
++    ItemObj *item=ItemObj::sFirstFree;
++    ItemObj *next=item->nextItem;
++    item->resetSlot();
++    item->nextItem=next;
++    ItemObj::add(ITEM_LARA,lead->room,lead->pos,lead->angle.y);
++    for (int i=0;i<MAX_ENEMIES;++i)
++        if (enemiesExtra[i].enemy) {
++            enemiesExtra[i].contact[0]=enemiesExtra[i].enemy->hitMask;
++            enemiesExtra[i].contact[1]=0;
++        }
++    return true;
++}
++
++static bool coopLeave()
++{
++    Lara *lara=players[1];
++    if (!lara)return false;
++    coopClearInteraction(lara);
++    hazardClearLaraBurn(lara);
++    if (inventory.lara==lara)inventory.lara=players[0];
++    if (gEffectState.lara==lara)gEffectState.lara=NULL;
++    if (tinfo.target==lara)tinfo.target=players[0];
++    for (int i=0;i<MAX_ENEMIES;++i) {
++        ExtraInfoEnemy &e=enemiesExtra[i];
++        if (!e.enemy)continue;
++        if (e.target==lara)e.target=NULL;
++        e.enemy->hitMask=e.contact[0];
++        e.contact[0]=e.contact[1]=0;
++    }
++    Camera &camera=playersExtra[0].camera;
++    if (camera.lookAtItem==lara)camera.lookAtItem=NULL;
++    if (camera.lastItem==lara)camera.lastItem=NULL;
++    lara->remove();
++    players[1]=NULL;
++    playersExtra[1].camera=Camera();
++    gCoopCollisionOffset=_vec3i(0,0,0);
++    return true;
++}
++
++// 0: moved, 1: no living partner, 2: reviving requires a large medipack.
++static int coopWarp(unsigned slot)
++{
++    if (slot>=MAX_PLAYERS || !players[0] || isCutsceneLevel())
++        return 1;
++    Lara *lara=players[slot], *lead=players[slot^1];
++    if (!lara || !lead || lead->health<=0)return 1;
++    if (lara->health<=0) {
++        if (!inventory.consumeCount(SLOT_MEDIKIT_BIG,1))return 2;
++        gSaveGame.mediUsed+=2;
++    }
++    coopClearInteraction(lara);
++    hazardClearLaraBurn(lara);
++    for (ItemObj *item=ItemObj::sFirstActive;item;) {
++        ItemObj *next=item->nextActive;
++        if (item->type==ITEM_MUZZLE_FLASH && item->extra==(uint8*)lara)item->remove();
++        item=next;
++    }
++    for (int i=0;i<MAX_ENEMIES;++i)enemiesExtra[i].contact[slot]=0;
++    lara->room->remove(lara);
++    lara->resetSlot();
++    lara->type=ITEM_LARA;
++    lara->pos=lead->pos;
++    lara->angle.y=lead->angle.y;
++    lara->intensity=128;
++    lara->init(lead->room);
++    if (slot)gCoopCollisionOffset=_vec3i(0,0,0);
++    else cinfo.offset=_vec3i(0,0,0);
++    return 0;
++}
++
+ bool gamePrepareInitialItemPool(uint16 itemCount)
+ {
+     if (itemCount > MAX_ITEMS)
+@@ -635,10 +724,22 @@
+         return;
+     }
+ 
++    if (players[1] && inventory.lara==players[1]) {
++        inventory.lara=players[0];
++        inventory.useSlot=SLOT_MAX;
++    }
++    for (int i=0;i<MAX_ENEMIES;++i) {
++        enemiesExtra[i].target=NULL;
++        enemiesExtra[i].contact[0]=enemiesExtra[i].contact[1]=0;
++    }
+     for (int32 i = 0; i < MAX_PLAYERS; i++)
+     {
+         players[i] = NULL;
++        gCoopInteraction[i]=NULL;
++        gLaraHazardState[i]=LaraHazardState();
+     }
++    gCoopPickupCount=0;
++    gCoopCollisionOffset=_vec3i(0,0,0);
+ 
+     if (gLevelID == LVL_TR1_TITLE) {
+         // init dummy Lara for updateInput()
+@@ -1507,10 +1608,16 @@
+     }
+     else
+     {
+-        for (int32 i = 0; i < MAX_PLAYERS; i++)
+-        {
+-            if (players[i]) {
+-                players[i]->update();
++        players[0]->update();
++        if (players[1]) {
++            if (inventory.state==INV_STATE_NONE && gNextLevel==LVL_MAX) {
++                const vec3i offset=cinfo.offset;
++                cinfo.offset=gCoopCollisionOffset;
++                players[1]->update();
++                gCoopCollisionOffset=cinfo.offset;
++                cinfo.offset=offset;
++            } else {
++                players[1]->updateInput();
+             }
+         }
+     }
+@@ -2298,8 +2405,28 @@
+         gCurTrack = -1;
+         sndPlayTrack(getAmbientTrack());
+     }
++    gCoopPickupCount=0;
++    bool coop=players[1]!=NULL;
++    const bool menuAtStart=inventory.state!=INV_STATE_NONE;
++    if (coop && !menuAtStart && gBrightness==0 && gNextLevel==LVL_MAX) {
++        const bool dead=players[0]->health<=0 && players[1]->health<=0;
++        Lara* owner=NULL;
++        const uint16 input[MAX_PLAYERS]={uint16(keys),gCoopInput};
++        for (int i=0;i<MAX_PLAYERS;++i)
++            if ((input[i]&IN_SELECT) && !(players[i]->input&IN_SELECT)) {
++                owner=players[i];
++                break;
++            }
++        if (dead && players[0]->deathAnimationDone() && players[1]->deathAnimationDone())
++            owner=players[0];
++        if (owner) {
++            players[0]->updateInput();
++            players[1]->updateInput();
++            inventory.open(owner,dead ? INV_PAGE_DEATH : INV_PAGE_MAIN);
++        }
++    }
+ 
+-    if (inventory.state != INV_STATE_NONE)
++    if (menuAtStart)
+     {
+         Lara* lara = (Lara*)inventory.lara;
+         ASSERT(lara);
+@@ -2307,17 +2434,19 @@
+         if (inventory.page != INV_PAGE_TITLE)
+ #endif
+             lara->updateInput();
++        if (coop)players[lara==players[0]]->updateInput();
+         inventory.update(frames);
+ 
+         if ((inventory.page != INV_PAGE_TITLE) && (inventory.state == INV_STATE_NONE))
+         {
+-            if (lara->useItem(inventory.useSlot)) {
++            if ((coop && lara->health<=0) || lara->useItem(inventory.useSlot)) {
+                 inventory.useSlot = SLOT_MAX;
+             }
+         }
+     }
+ 
+-    if ((inventory.page != INV_PAGE_TITLE) && (inventory.state == INV_STATE_NONE) && (gNextLevel == LVL_MAX))
++    if ((inventory.page != INV_PAGE_TITLE) && (inventory.state == INV_STATE_NONE) &&
++        (gNextLevel == LVL_MAX) && !(coop && menuAtStart))
+     {
+         updateSimulationTicks(frames);
+         updateLevel(frames);
+--- a/src/fixed/hazard_damocles.h
++++ b/src/fixed/hazard_damocles.h
+@@ -48,7 +48,7 @@
+     {
+         if (phase() == DORMANT)
+         {
+-            Lara *lara = players[0];
++            Lara *lara=getLara(pos);
+             if (!lara)
+                 return;
+ 
+@@ -89,7 +89,8 @@
+             flags |= ITEM_FLAG_STATUS_INACTIVE;
+         }
+ 
+-        hitLara(players[0], &cinfo);
++        for (int i=0;i<MAX_PLAYERS;++i)
++            hitLara(players[i],&cinfo);
+     }
+ 
+     virtual void collide(Lara *, CollisionInfo *) {}
+--- a/src/fixed/hazard_flame.h
++++ b/src/fixed/hazard_flame.h
+@@ -74,10 +74,11 @@
+         soundPlay(HazardOracleFlame::FLAME_SOUND, &pos);
+         if (timer > 0) { timer--; return; }
+ 
+-        Lara *lara = players[0];
+-        if (!lara || lara->health <= 0 || hazardLaraIsBurning(lara) ||
+-            !flameWithinRadius(pos, lara->pos, HazardOracleFlame::HEAT_RADIUS))
+-            return;
++        for (int slot=0;slot<MAX_PLAYERS;++slot) {
++            Lara* lara=players[slot];
++            if (!lara || lara->health<=0 || hazardLaraIsBurning(lara) ||
++                !flameWithinRadius(pos,lara->pos,HazardOracleFlame::HEAT_RADIUS))
++                continue;
+ 
+         hazardDamageLara(lara, HazardOracleFlame::HEAT_DAMAGE,
+             HAZARD_HIT_FLAME, pos);
+@@ -86,6 +87,7 @@
+             hazardIgniteLara(lara, uint16((ItemObj*)this - items));
+             timer = HazardOracleFlame::IGNITION_COOLDOWN_TICKS;
+         }
++        }
+     }
+     virtual void collide(Lara *, CollisionInfo *) {}
+ };
+--- a/src/fixed/hazard_slam.h
++++ b/src/fixed/hazard_slam.h
+@@ -21,7 +21,8 @@
+             CollisionInfo cinfo;
+             memset(&cinfo, 0, sizeof(cinfo));
+             cinfo.radius = LARA_RADIUS;
+-            bite(players[0], &cinfo);
++            for (int i=0;i<MAX_PLAYERS && !(flags&FLAG_BITE);++i)
++                bite(players[i],&cinfo);
+         }
+         else
+             goalState = STATE_OPEN;
+--- a/src/fixed/hazard_thor_lightning.h
++++ b/src/fixed/hazard_thor_lightning.h
+@@ -86,7 +86,8 @@
+                 goalState = isActive() ? STATE_FALL : STATE_IDLE;
+                 break;
+             case STATE_FALL:
+-                impact(players[0]);
++                for (int i=0;i<MAX_PLAYERS;++i)
++                    impact(players[i]);
+                 break;
+             case STATE_DOWN:
+                 executeDownTrigger();
+@@ -145,24 +146,24 @@
+ 
+     bool hasTargets() const { return level.models[type].count > 1; }
+ 
+-    void strike(Lara *lara)
++    void strike()
+     {
+         const bool targets = hasTargets();
+         const int32 radius = targets ? TARGET_RADIUS : EMPTY_RADIUS;
+         turnSpeed = 0;
+-        if (lara)
+-        {
++        bool hit=false;
++        for (int slot=0;slot<MAX_PLAYERS;++slot) {
++            Lara* lara=players[slot];
++            if (!lara)continue;
+             const vec3i d = lara->pos - pos;
+             if (dot(d, d) < radius * radius)
+             {
+                 hazardDamageLara(lara, DAMAGE, HAZARD_HIT_LIGHTNING, pos);
+                 nextState = 0;
++                hit=true;
+             }
+-            else if (targets)
+-                turnSpeed = int16(1 + RAND_LOGIC(5));
+         }
+-        else if (targets)
+-            turnSpeed = int16(1 + RAND_LOGIC(5));
++        if (!hit && targets)turnSpeed=int16(1+RAND_LOGIC(5));
+         soundPlay(SND_LIGHTNING, &pos);
+     }
+ 
+@@ -197,7 +198,7 @@
+             worldRequestFlipToggle();
+         state = STATE_FLASH;
+         timer = FLASH_TICKS;
+-        strike(players[0]);
++        strike();
+     }
+ 
+     virtual void collide(Lara *lara, CollisionInfo *cinfo)
+--- a/src/fixed/item.h
++++ b/src/fixed/item.h
+@@ -63,7 +63,12 @@
+ 
+     if (pos)
+     {
+-        vec3i d = *pos - playersExtra[0].camera.target.pos; // TODO find nearest camera for coop
++        const Camera *listener=&playersExtra[0].camera;
++        if (players[1] &&
++            coopDistanceSquared(*pos,playersExtra[1].camera.view.pos)<=
++            coopDistanceSquared(*pos,listener->view.pos))
++            listener=&playersExtra[1].camera;
++        vec3i d = *pos - listener->target.pos;
+ 
+         if (abs(d.x) >= SND_MAX_DIST || abs(d.y) >= SND_MAX_DIST || abs(d.z) >= SND_MAX_DIST)
+             return NULL;
+@@ -602,6 +607,7 @@
+     {
+         if (playersExtra[i].armR.target == this) playersExtra[i].armR.target = NULL;
+         if (playersExtra[i].armL.target == this) playersExtra[i].armL.target = NULL;
++        if (gCoopInteraction[i]==this)gCoopInteraction[i]=NULL;
+     }
+     // Final cleanup boundary: NULL marks this slot as free immediately
+     // before its single publication to the free list.
+--- a/src/fixed/lara.h
++++ b/src/fixed/lara.h
+@@ -148,6 +148,39 @@
+ EWRAM_DATA Lara* players[MAX_PLAYERS];
+ EWRAM_DATA CollisionInfo cinfo;
+ EWRAM_DATA LaraHazardState gLaraHazardState[MAX_PLAYERS];
++uint16 gCoopInput;
++Lara* gCoopShooter;
++ItemObj* gCoopInteraction[MAX_PLAYERS];
++uint16 gCoopPickups[MAX_ITEMS];
++unsigned gCoopPickupCount;
++static vec3i gCoopCollisionOffset;
++
++uint64_t coopDistanceSquared(const vec3i &a,const vec3i &b)
++{
++    vec3i d=a-b;
++    return uint64_t(int64_t(d.x)*d.x)+uint64_t(int64_t(d.y)*d.y)+uint64_t(int64_t(d.z)*d.z);
++}
++
++int32 coopSelectedUse(const Lara* lara)
++{
++    return players[1] && inventory.lara!=(const void*)lara ? SLOT_MAX : inventory.useSlot;
++}
++
++bool coopClaimBlocked(const Lara* lara,const ItemObj* item)
++{
++    return players[1] && gCoopInteraction[lara==players[0]]==item;
++}
++
++void coopClaim(const Lara* lara,ItemObj* item)
++{
++    gCoopInteraction[lara==players[1]]=item;
++}
++
++void coopPickup(const Lara* lara,const ItemObj* item)
++{
++    ASSERT(gCoopPickupCount<MAX_ITEMS);
++    gCoopPickups[gCoopPickupCount++]=uint16(item->type | ((lara==players[1])<<8));
++}
+ 
+ const WeaponParams weaponParams[WEAPON_MAX] = {
+     { // WEAPON_PISTOLS
+@@ -2839,7 +2872,7 @@
+         input = 0;
+ 
+     #if defined(__TR64_ORACLE__)
+-        input = uint16(keys);
++        input = this==players[1] ? gCoopInput : uint16(keys);
+     #else
+     #if defined(__3DO__)
+         if (keys & IK_A) input |= IN_JUMP;
+@@ -3228,18 +3261,19 @@
+ 
+     bool applyFlowCurrent()
+     {
+-        if (!gFlowState.active || extraL->dozy)
++        FlowState &flow=gFlowState[this==players[1]];
++        if (!flow.active || extraL->dozy)
+             return false;
+-        if (gFlowState.cameraIndex < 0 ||
+-            uint16(gFlowState.cameraIndex) >= level.camerasCount ||
++        if (flow.cameraIndex < 0 ||
++            uint16(flow.cameraIndex) >= level.camerasCount ||
+             !level.cameras || !room || !level.boxes ||
+             !level.overlaps || gSaveGame.flipped > 1)
+         {
+-            gFlowState.active = 0;
++            flow.active = 0;
+             return false;
+         }
+ 
+-        const FixedCamera &sink = level.cameras[gFlowState.cameraIndex];
++        const FixedCamera &sink = level.cameras[flow.cameraIndex];
+         const Sector *sector = room->getSector(pos.x, pos.z);
+         uint16 boxIndex = sector->boxIndex;
+         if (boxIndex >= level.boxesCount || sink.flags >= level.boxesCount)
+@@ -3273,7 +3307,7 @@
+         applyFlowAxis(pos.z, target.z, strength);
+         if (angle.x <= 0)
+             applyFlowAxis(pos.y, target.y, strength);
+-        gFlowState.active = 0;
++        flow.active = 0;
+         if (waterState == WATER_STATE_SURFACE)
+             s_dive();
+         return true;
+@@ -3318,7 +3352,9 @@
+         if (!target || target->health <= 0)
+             return false;
+         int32 healthBefore = target->health;
++        gCoopShooter=this;
+         target->hit(damage, point, 0);
++        gCoopShooter=NULL;
+         if (healthBefore > 0 && target->health <= 0)
+         {
+             gSaveGame.kills++;
+@@ -4116,28 +4152,26 @@
+         health = X_MAX(0, health - damage);
+     }
+ 
++    bool deathAnimationDone() const
++    {
++        return (state==STATE_DEATH || state==STATE_DEATH_UW || state==STATE_DEATH_MIDAS) &&
++            animIsEnd(0);
++    }
+     virtual void update()
+     {
+         vec3i oldPos = pos;
+ 
+         updateInput();
+ 
+-        if ((input & (IN_JUMP | IN_WEAPON)) == (IN_JUMP | IN_WEAPON))
+-        {
+-            restore();
+-        }
+-
+-        if (health <= 0 && gBrightness == 0 &&
+-            inventory.state == INV_STATE_NONE &&
+-            (state == STATE_DEATH || state == STATE_DEATH_UW ||
+-             state == STATE_DEATH_MIDAS) &&
+-            animIsEnd(0))
+-        {
+-            inventory.open(this, INV_PAGE_DEATH);
+-        }
+-        else if (isKeyHit(IN_SELECT) && (gBrightness == 0))
+-        {
+-            inventory.open(this, (health > 0) ? INV_PAGE_MAIN : INV_PAGE_DEATH);
++        if (!players[1]) {
++            if ((input & (IN_JUMP | IN_WEAPON)) == (IN_JUMP | IN_WEAPON))
++                restore();
++
++            if (health <= 0 && gBrightness == 0 && inventory.state == INV_STATE_NONE &&
++                deathAnimationDone())
++                inventory.open(this, INV_PAGE_DEATH);
++            else if (isKeyHit(IN_SELECT) && gBrightness == 0)
++                inventory.open(this, health>0 ? INV_PAGE_MAIN : INV_PAGE_DEATH);
+         }
+ 
+         updateLook();
+@@ -4198,13 +4232,28 @@
+ 
+         updateWeapon();
+ 
+-        checkTrigger(cinfo.trigger, this);
++        if (!players[1] || health>0)checkTrigger(cinfo.trigger,this);
+ 
+         extraL->camera.update();
+ 
+         if (health > 0 && extraL->healthTimer > 0) {
+             extraL->healthTimer--;
+         }
++        ItemObj*& claim=gCoopInteraction[this==players[1]];
++        if (claim && inventory.state==INV_STATE_NONE) {
++            switch (state) {
++            case STATE_STOP:
++                if (health>0 && goalState==STATE_BLOCK_READY)break;
++                claim=NULL;
++                break;
++            case STATE_PICKUP: case STATE_USE_KEY: case STATE_USE_PUZZLE:
++            case STATE_USE_MIDAS: case STATE_SWITCH_UP: case STATE_SWITCH_DOWN:
++            case STATE_BLOCK_READY: case STATE_BLOCK_PUSH: case STATE_BLOCK_PULL:
++                if (health>0)break;
++                // fall through
++            default: claim=NULL;break;
++            }
++        }
+     }
+ 
+     void meshSwapPistols(uint32 weaponMask, uint32 bodyMask)
+@@ -4623,7 +4672,10 @@
+ 
+ Lara* getLara(const vec3i &pos)
+ {
+-    return players[0]; // TODO find nearest player
++    Lara *a=players[0],*b=players[1];
++    if (!b || b->health<=0)return a;
++    if (!a || a->health<=0)return b;
++    return coopDistanceSquared(pos,b->pos)<coopDistanceSquared(pos,a->pos) ? b : a;
+ }
+ 
+ #endif
+--- a/src/fixed/level.h
++++ b/src/fixed/level.h
+@@ -34,7 +34,7 @@
+ 
+ EWRAM_DATA int32 gBrightness;
+ EWRAM_DATA FlipMapState gFlipMapState[TR1_FLIPMAP_COUNT];
+-EWRAM_DATA FlowState gFlowState;
++EWRAM_DATA FlowState gFlowState[MAX_PLAYERS];
+ EWRAM_DATA EffectState gEffectState;
+ EWRAM_DATA FlipMapState gFlipMapBackup[TR1_FLIPMAP_COUNT];
+ EWRAM_DATA uint8 gFlipTransactionActive;
+--- a/src/fixed/object.h
++++ b/src/fixed/object.h
+@@ -500,7 +500,7 @@
+         for (int32 playerIndex = 0; playerIndex < MAX_PLAYERS; playerIndex++)
+         {
+             Lara* lara = players[playerIndex];
+-            if (!lara) continue;
++            if (!lara || (players[1] && lara->health<=0))continue;
+ 
+             Sphere* spheres = gSpheres[1];
+             int32 count = lara->getSpheres(spheres, true);
+@@ -739,9 +739,9 @@
+             return;
+         }
+ 
+-        Lara* lara = getLara(pos);
+-        if (lara && lara->health > 0)
+-        {
++        for (int slot=0;slot<MAX_PLAYERS;++slot) {
++            Lara *lara=players[slot];
++            if (!lara || lara->health<=0)continue;
+             const int32 dx = lara->pos.x - pos.x;
+             const int32 dz = lara->pos.z - pos.z;
+             const AABBs &box = lara->getBoundingBox(true);
+@@ -1166,6 +1166,8 @@
+ 
+         if (!checkLimit(lara, LIMIT_SWITCH))
+             return;
++        if (coopClaimBlocked(lara,this))return;
++        coopClaim(lara,this);
+ 
+         lara->angle.y = angle.y;
+ 
+@@ -1222,10 +1224,12 @@
+ 
+         if (!checkLimit(lara, LIMIT_SWITCH_UW))
+             return;
++        if (coopClaimBlocked(lara,this))return;
+ 
+         if (!lara->moveTo(_vec3i(0, 0, 108), this, true))
+             return;
+ 
++        coopClaim(lara,this);
+         lara->vSpeed = 0; // underwater speed
+         goalState = (state == STATE_UP) ? STATE_DOWN : STATE_UP;
+ 
+@@ -1283,6 +1287,7 @@
+ 
+     virtual void collide(Lara* lara, CollisionInfo* cinfo)
+     {
++        if (coopClaimBlocked(lara,this))return;
+         angle.y = lara->angle.y;
+         angle.z = 0;
+ 
+@@ -1301,6 +1306,7 @@
+                 if (!inventory.addPickup((ItemType)type))
+                     return;
+                 gSaveGame.pickups++;
++                coopPickup(lara,this);
+ #if defined(__N64_MG__) && defined(OPENLARA_N64_CAMPAIGN_REGRESSION)
+                 n64CampaignEconomyObserve(
+                     N64_CAMPAIGN_ECONOMY_OWNER_PICKUP);
+@@ -1320,6 +1326,7 @@
+                 if (!lara->moveTo(_vec3i(0, 0, -100), this, false))
+                     return;
+ 
++                coopClaim(lara,this);
+                 lara->animSkip(Lara::STATE_PICKUP, Lara::STATE_STOP);
+                 lara->extraL->weaponState = WEAPON_STATE_BUSY;
+             }
+@@ -1340,6 +1347,7 @@
+                 if (!inventory.addPickup((ItemType)type))
+                     return;
+                 gSaveGame.pickups++;
++                coopPickup(lara,this);
+ #if defined(__N64_MG__) && defined(OPENLARA_N64_CAMPAIGN_REGRESSION)
+                 n64CampaignEconomyObserve(
+                     N64_CAMPAIGN_ECONOMY_OWNER_PICKUP);
+@@ -1360,6 +1368,7 @@
+                 if (!lara->moveTo(_vec3i(0, -200, -350), this, true))
+                     return;
+ 
++                coopClaim(lara,this);
+                 lara->animSkip(Lara::STATE_PICKUP, Lara::STATE_UW_TREAD);
+ 
+                 // TODO TR2+
+@@ -1391,6 +1400,7 @@
+ 
+     void apply(int32 offset, Lara* lara, Lara::State stateUse)
+     {
++        const int32 selected=coopSelectedUse(lara);
+         if (lara->extraL->weaponState != WEAPON_STATE_FREE)
+             return;
+ 
+@@ -1400,21 +1410,25 @@
+         if (lara->state != Lara::STATE_STOP || lara->animIndex != Lara::ANIM_STAND_NORMAL)
+             return;
+ 
+-        if (!(lara->input & IN_ACTION) && (inventory.useSlot == SLOT_MAX))
++        if (!(lara->input & IN_ACTION) && selected==SLOT_MAX)
+             return;
+ 
+         if (!checkLimit(lara, LIMIT_HOLE))
+             return;
+ 
+-        if (inventory.useSlot == SLOT_MAX)
++        if (coopClaimBlocked(lara,this))return;
++        if (selected==SLOT_MAX)
+         {
+-            if (inventory.numKeys > 0) {
++            if (inventory.numKeys>0 &&
++                (!players[1] || (inventory.state==INV_STATE_NONE && inventory.useSlot==SLOT_MAX))) {
++                coopClaim(lara,this);
+                 inventory.open(lara, INV_PAGE_USE, type);
+                 return;
+             }
+         } else {
+             if (inventory.applyItem(this))
+             {
++                coopClaim(lara,this);
+                 lara->moveTo(_vec3i(0, 0, offset), this, false);
+                 lara->animSkip(stateUse, Lara::STATE_STOP);
+                 lara->extraL->weaponState = WEAPON_STATE_BUSY;
+@@ -1446,6 +1460,7 @@
+ 
+     virtual void collide(Lara* lara, CollisionInfo* cinfo)
+     {
++        if (coopClaimBlocked(lara,this))return;
+         if (lara->state == Lara::STATE_USE_PUZZLE)
+         {
+             if (!checkLimit(lara, LIMIT_HOLE))
+@@ -1741,6 +1756,7 @@
+         if (lara->pos.y != pos.y)
+             return;
+ 
++        if (coopClaimBlocked(lara,this))return;
+         uint16 quadrant = uint16(lara->angle.y + ANGLE_45) >> ANGLE_SHIFT_90;
+ 
+         if ((lara->animIndex == Lara::ANIM_BLOCK_READY) && (lara->input & (IN_UP | IN_DOWN)))
+@@ -1768,6 +1784,7 @@
+                 goalState = STATE_PULL;
+             }
+ 
++            coopClaim(lara,this);
+             updateFloor(1024);
+ 
+             activate();
+@@ -1791,6 +1808,7 @@
+             if (!checkLimit(lara, LIMIT_BLOCK))
+                 return;
+ 
++            coopClaim(lara,this);
+             lara->goalState = Lara::STATE_BLOCK_READY;
+             lara->angle.y = angle.y;
+             lara->alignWall(LARA_RADIUS);
+--- a/src/fixed/progression.h
++++ b/src/fixed/progression.h
+@@ -13,6 +13,7 @@
+     virtual void collide(Lara *lara, CollisionInfo *cinfo)
+     {
+         (void)cinfo;
++        if (players[1] && lara->room!=room)return;
+ 
+         if (!(lara->flags & ITEM_FLAG_GRAVITY) &&
+             lara->state == Lara::STATE_STOP &&
+@@ -39,24 +40,29 @@
+             return;
+         }
+ 
++        const int32 selected=coopSelectedUse(lara);
+         if ((lara->flags & ITEM_FLAG_GRAVITY) ||
+             lara->state != Lara::STATE_STOP ||
+             lara->extraL->weaponState != WEAPON_STATE_FREE ||
+-            (!(lara->input & IN_ACTION) && inventory.useSlot == SLOT_MAX))
++            (!(lara->input & IN_ACTION) && selected==SLOT_MAX))
+             return;
+ 
+         uint16 quadrant = uint16(lara->angle.y + ANGLE_45) >> ANGLE_SHIFT_90;
+         angle.y = int16(quadrant << ANGLE_SHIFT_90);
+         if (!checkLimit(lara, LIMIT_MIDAS))
+             return;
++        if (coopClaimBlocked(lara,this))return;
+ 
+-        if (inventory.useSlot == SLOT_MAX)
++        if (selected==SLOT_MAX)
+         {
+-            inventory.open(lara, INV_PAGE_USE);
++            if (!players[1] || (inventory.state==INV_STATE_NONE && inventory.useSlot==SLOT_MAX)) {
++                coopClaim(lara,this);
++                inventory.open(lara,INV_PAGE_USE);
++            }
+             return;
+         }
+ 
+-        if (inventory.useSlot != SLOT_LEADBAR)
++        if (selected!=SLOT_LEADBAR)
+         {
+             inventory.useSlot = SLOT_MAX;
+             return;
+@@ -71,6 +77,7 @@
+             !inventory.addCount(SLOT_PUZZLE_1, 1) ||
+             !inventory.consumeCount(SLOT_LEADBAR, 1))
+             return;
++        coopClaim(lara,this);
+         lara->animSet(level.models[ITEM_LARA_SPEC].animIndex, true);
+         lara->state = Lara::STATE_USE_MIDAS;
+         lara->goalState = Lara::STATE_USE_MIDAS;
+@@ -98,6 +105,7 @@
+         if ((flags & ITEM_FLAG_STATUS) == ITEM_FLAG_STATUS_INVISIBLE)
+             return;
+ 
++        if (coopClaimBlocked(lara,this))return;
+         angle.x = 0;
+         angle.y = lara->angle.y;
+         angle.z = 0;
+@@ -112,6 +120,7 @@
+             if (!inventory.addPickup((ItemType)type))
+                 return;
+             gSaveGame.pickups++;
++            coopPickup(lara,this);
+             room->remove(this);
+             flags &= ~ITEM_FLAG_STATUS;
+             flags |= ITEM_FLAG_STATUS_INVISIBLE;
+@@ -125,6 +134,7 @@
+             return;
+ 
+         lara->moveTo(_vec3i(0, 640, -310), this, false);
++        coopClaim(lara,this);
+         lara->animSet(level.models[ITEM_LARA_SPEC].animIndex, true);
+         lara->state = Lara::STATE_PICKUP;
+         lara->goalState = Lara::STATE_PICKUP;
+@@ -144,6 +154,7 @@
+     virtual void collide(Lara *lara, CollisionInfo *cinfo)
+     {
+         (void)cinfo;
++        if (coopClaimBlocked(lara,this))return;
+         angle.x = 0;
+         angle.y = lara->angle.y;
+         angle.z = 0;
+@@ -157,6 +168,7 @@
+             return;
+ 
+         lara->moveTo(_vec3i(0, 280, -407), this, false);
++        coopClaim(lara,this);
+         lara->animSet(level.models[ITEM_LARA_SPEC].animIndex, true);
+         lara->state = Lara::STATE_PICKUP;
+         lara->goalState = Lara::STATE_PICKUP;
+@@ -249,6 +261,7 @@
+                 initExplosionSlot(
+                     effect, room, explosionPos, ANGLE_0);
+                 playersExtra[0].camera.bounce = -200;
++                if (players[1])playersExtra[1].camera.bounce=-200;
+             }
+         }
+ 
+--- a/src/fixed/room.h
++++ b/src/fixed/room.h
+@@ -1112,7 +1112,7 @@
+             }
+ 
+             case TRIGGER_ACTION_FLOW:
+-                worldSetFlow(FD_ARGS(triggerCmd));
++                worldSetFlow(FD_ARGS(triggerCmd),lara && lara==(void*)players[1]);
+                 break;
+ 
+             case TRIGGER_ACTION_FLIP:
+--- a/src/fixed/world_state.h
++++ b/src/fixed/world_state.h
+@@ -127,7 +127,7 @@
+ 
+ typedef void (*WorldEffectHandler)();
+ 
+-extern FlowState gFlowState;
++extern FlowState gFlowState[MAX_PLAYERS];
+ extern EffectState gEffectState;
+ extern FlipMapState gFlipMapBackup[TR1_FLIPMAP_COUNT];
+ extern uint8 gFlipTransactionActive;
+@@ -176,8 +176,10 @@
+     gFlipTransactionActive = 0;
+     gFlipTransitionPending = 0;
+ 
+-    gFlowState.cameraIndex = -1;
+-    gFlowState.active = 0;
++    for (int slot=0;slot<MAX_PLAYERS;++slot) {
++        gFlowState[slot].cameraIndex=-1;
++        gFlowState[slot].active=0;
++    }
+ 
+     gEffectState.lara = NULL;
+     gEffectState.id = -1;
+@@ -185,13 +187,13 @@
+     gEffectState.cameraBounce = 0;
+ }
+ 
+-bool worldSetFlow(uint16 cameraIndex)
++bool worldSetFlow(uint16 cameraIndex,unsigned slot)
+ {
+     if (!level.cameras || cameraIndex >= level.camerasCount)
+         return false;
+ 
+-    gFlowState.cameraIndex = int16(cameraIndex);
+-    gFlowState.active = 1;
++    gFlowState[slot].cameraIndex = int16(cameraIndex);
++    gFlowState[slot].active = 1;
+     return true;
+ }
+ 

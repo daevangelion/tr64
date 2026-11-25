@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""Strict linked-ELF physical image extent gate (low pages and padding included).
+Allocated sections, linked object ownership and optional module/symbol detail
+are reported. Carved pools have no ELF storage; .tlbcode.* sections are units.
+"""
+import argparse
+import collections
+import json
+import pathlib
+import re
+import struct
+import sys
+sys.dont_write_bytecode = True
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.append(str(ROOT / "tools/cook"))
+from pool_rows import pool_rows, pool_table, reserve_bytes
+
+
+def sections(path):
+    data = pathlib.Path(path).read_bytes()
+    if data[:6] != b"\x7fELF\x01\x02":
+        raise ValueError("expected 32-bit big-endian cart ELF")
+    h = struct.unpack_from(">16sHHIIIIIHHHHHH", data)
+    offset, stride, count, strings = h[6], h[11], h[12], h[13]
+    if stride != 40 or not 0 < strings < count or offset + count * stride > len(data):
+        raise ValueError("invalid ELF section table")
+    rows = [struct.unpack_from(">10I", data, offset + i * stride) for i in range(count)]
+    sh = rows[strings]
+    names = data[sh[4]:sh[4] + sh[5]]
+    result = []
+    for row in rows:
+        end = names.find(b"\0", row[0])
+        if end < 0:
+            raise ValueError("invalid section name")
+        name = names[row[0]:end].decode("ascii")
+        if row[2] & 2:
+            kind = "bss" if row[1] == 8 else "text" if row[2] & 4 else "data" if row[2] & 1 else "rodata"
+            result.append({"name": name, "address": row[3], "bytes": row[5], "kind": kind,
+                           "unit": name.startswith(".tlbcode.")})
+    return result
+
+def symbols(path):
+    data = pathlib.Path(path).read_bytes()
+    h = struct.unpack_from(">16sHHIIIIIHHHHHH", data)
+    rows = [struct.unpack_from(">10I", data, h[6] + i * h[11]) for i in range(h[12])]
+    result = []
+    for row in rows:
+        if row[1] != 2:
+            continue
+        strings = rows[row[6]]
+        names = data[strings[4]:strings[4]+strings[5]]
+        for offset in range(row[4], row[4]+row[5], row[9]):
+            name, value, size, info, _, section = struct.unpack_from(">IIIBBH", data, offset)
+            end = names.find(b"\0", name)
+            if end < 0:
+                raise ValueError("invalid ELF symbol name")
+            result.append({"name": names[name:end].decode("ascii"), "address": value,
+                           "bytes": size, "type": info & 15, "section": section})
+    return result
+
+
+def owner_name(path):
+    return path.split("/cart/", 1)[1] if "/cart/" in path else path.rsplit("/", 1)[-1]
+
+
+def module_name(owner):
+    if owner.startswith("game/"):
+        return "game/"
+    if owner.startswith(("engine/", "plat/")):
+        return "/".join(owner.split("/")[:2]) + "/"
+    for archive, module in (("libt3d.a", "tiny3d"), ("libdragon.a", "libdragon"),
+                            ("libdragonsys.a", "libdragonsys"), ("libgcc.a", "libgcc"),
+                            ("libc.a", "newlib/libc"), ("libm.a", "newlib/libm")):
+        if owner.startswith(archive):
+            return module
+    return "CRT/other"
+
+
+def breakdown(path, rows):
+    records = []
+    in_map, section = False, ""
+    for line in pathlib.Path(path).read_text().splitlines():
+        if line == "Linker script and memory map":
+            in_map = True
+        if not in_map:
+            continue
+        if line.startswith("Cross Reference Table"):
+            break
+        heading = re.match(r"^ (\.\S+)(?:\s|$)", line)
+        if heading:
+            section = heading[1]
+        match = re.search(r"\s(0x[0-9a-f]+)\s+(0x[0-9a-f]+)\s+(\S+\.(?:o|a)(?:\([^)]*\))?)\s*$", line)
+        if not match:
+            continue
+        address, size = int(match[1], 16), int(match[2], 16)
+        resident = next((r for r in rows if not r["unit"] and size and
+                         r["address"] <= address and address + size <= r["address"] + r["bytes"]), None)
+        if resident:
+            records.append({"address": address, "bytes": size, "kind": resident["kind"],
+                            "section": section, "owner": owner_name(match[3]),
+                            "merged_strings": bool(re.search(r"\.str\d+\.\d+", section))})
+    if not records:
+        raise ValueError("linker map contains no resident object contributions")
+    return records
+
+
+def detailed_report(records, elf_symbols, totals):
+    modules = collections.defaultdict(collections.Counter)
+    objects = collections.defaultdict(collections.Counter)
+    largest = {}
+    for record in records:
+        objects[record["owner"]][record["kind"]] += record["bytes"]
+        module = "shared merged strings" if record["merged_strings"] else module_name(record["owner"])
+        modules[module][record["kind"]] += record["bytes"]
+    for kind, total in totals.items():
+        remainder = total - sum(row[kind] for row in modules.values())
+        if remainder < 0:
+            raise ValueError("map object sections overlap or exceed ELF totals")
+        modules["ELF fill/metadata"][kind] = remainder
+    for symbol in elf_symbols:
+        if not symbol["bytes"] or symbol["type"] not in (1, 2):
+            continue
+        owner = next((r for r in records if r["address"] <= symbol["address"] and
+                      symbol["address"] + symbol["bytes"] <= r["address"] + r["bytes"]), None)
+        if not owner or module_name(owner["owner"]) == "game/":
+            continue
+        key = (symbol["address"], symbol["bytes"])
+        if key in largest:
+            largest[key]["aliases"].append(symbol["name"])
+        else:
+            largest[key] = {**symbol, "owner": owner["owner"], "kind": owner["kind"], "aliases": []}
+    return dict(modules), dict(objects), sorted(largest.values(), key=lambda row: -row["bytes"])[:40]
+
+
+def print_table(title, table):
+    print(title + " (text rodata data bss total):")
+    for name, counts in sorted(table.items(), key=lambda item: -sum(item[1].values())):
+        print(" ".join(f"{counts.get(kind, 0):8d}" for kind in ("text", "rodata", "data", "bss")),
+              f"{sum(counts.values()):8d}", name)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("elf", type=pathlib.Path)
+    ap.add_argument("--json", type=pathlib.Path)
+    ap.add_argument("--pools", type=pathlib.Path, help="override the build-selected memory rows")
+    ap.add_argument("--detail", action="store_true", help="show modules, SDK sources and largest 40 non-game symbols")
+    ns = ap.parse_args()
+    rows = sections(ns.elf)
+    totals = {k: sum(r["bytes"] for r in rows if not r["unit"] and r["kind"] == k) for k in ("text", "rodata", "data", "bss")}
+    table_path = ns.pools or pool_table()
+    table = pool_rows(table_path)
+    reserve = reserve_bytes(table, table_path)
+    budget = next(size for name, size, _ in table if name == "image")
+    elf_symbols = symbols(ns.elf)
+    actual = next(symbol["address"] for symbol in elf_symbols if symbol["name"] == "__bss_end") - 0x80000000
+    records = breakdown(ns.elf.with_suffix(".map"), rows)
+    modules, objects, largest = detailed_report(records, elf_symbols, totals)
+    counts = collections.Counter({name: sum(values.values()) for name, values in objects.items()})
+    status = "OVER" if actual > budget else "PASS"
+    print(f"size_gate {status} pool=image resident={actual} section_bytes={sum(totals.values())} budget={budget} " + " ".join(f"{k}={v}" for k, v in totals.items()))
+    print(f"size_gate table={table_path.name} declared={sum(size for _, size, _ in table)} reserve={reserve}")
+    for row in rows:
+        print(f"section {row['name']} bytes={row['bytes']} address={row['address']:08x} {'UNIT' if row['unit'] else row['kind']}")
+    print("resident archive/object top 30 (linked map, excludes units):")
+    print("GNU ld assigns merged strings to their first map owner; these are linked ownership, not source-unique string costs.")
+    for label, size in counts.most_common(30):
+        print(f"{size:8d} {label}")
+    print(f"map-accounted={sum(counts.values())} ELF-padding/metadata={actual-sum(counts.values())}")
+    if ns.detail:
+        print_table("resident modules; merged strings have no unique source owner", modules)
+        print_table("libdragon by linked source object", {name: count for name, count in objects.items() if module_name(name) in ("libdragon", "libdragonsys")})
+        print("largest 40 sized resident symbols outside game/ (aliases deduplicated; not marginal savings):")
+        for symbol in largest:
+            print(f"{symbol['bytes']:8d} {symbol['kind']:6s} {symbol['name']} {symbol['owner']}")
+    report = {"status": status, "resident": actual, "budget": budget, "totals": totals,
+              "pool_table": table_path.name, "reserve_bytes": reserve,
+              "sections": rows, "objects": counts, "object_sections": objects,
+              "modules": modules, "largest_non_game": largest,
+              "map_records": records}
+    if ns.json:
+        ns.json.parent.mkdir(parents=True, exist_ok=True)
+        ns.json.write_text(json.dumps(report, indent=2) + "\n")
+    return int(actual > budget)
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, struct.error) as error:
+        raise SystemExit(f"size_gate ERROR: {error}")

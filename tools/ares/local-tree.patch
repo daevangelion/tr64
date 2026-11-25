@@ -1,0 +1,358 @@
+# SPDX-License-Identifier: ISC (ares)
+# Working-tree modifications of the shared ares checkout $ARES_SRC
+# on top of revision d9117003192cd43806ddc24d20c764ddb9afc965 (git diff of 8 files, 2026-11-18).
+# Apply with patch -p1 before sram-persistence.patch (its preimage is this tree's testharness.cpp).
+diff --git a/ares/n64/accuracy.hpp b/ares/n64/accuracy.hpp
+index 4bad23337..dd5cdfbd3 100644
+--- a/ares/n64/accuracy.hpp
++++ b/ares/n64/accuracy.hpp
+@@ -26,7 +26,9 @@ struct Accuracy {
+   struct PIF {
+     // Emulate a region-locked console
+     static constexpr bool RegionLock = false;
+-    // Emulate the PIF's checksum security check
+-    static constexpr bool IPL2Checksum = true;
++    // Emulate the PIF's checksum security check.
++    // Disabled for homebrew 64DD IPL4ROM / Zoinkity IPL testing: those ROMs
++    // do not carry retail CIC IPL2 digests, so the PIF would halt in Error.
++    static constexpr bool IPL2Checksum = false;
+   };
+ };
+diff --git a/ares/n64/cartridge/flash.cpp b/ares/n64/cartridge/flash.cpp
+index 32402929d..79c9e0336 100644
+--- a/ares/n64/cartridge/flash.cpp
++++ b/ares/n64/cartridge/flash.cpp
+@@ -79,8 +79,11 @@ auto Cartridge::Flash::writeWord(u32 address, u64 data) -> void {
+ 
+   case 0xd2:  //execute
+     if(mode == Mode::Erase) {
+-      for(u32 index = 0; index < 128; index += 2) {
+-        Memory::Writable::write<Half>(offset + index, 0xffff);
++      //the chip erases a whole sector (128 pages of 128 bytes), not just the page
++      //named by the erase command
++      u32 sector = offset & ~(16_KiB - 1);
++      for(u32 index = 0; index < 16_KiB; index += 2) {
++        Memory::Writable::write<Half>(sector + index, 0xffff);
+       }
+     }
+     if(mode == Mode::Write) {
+diff --git a/ares/n64/cartridge/testharness.cpp b/ares/n64/cartridge/testharness.cpp
+index 099300f32..10449ea6c 100644
+--- a/ares/n64/cartridge/testharness.cpp
++++ b/ares/n64/cartridge/testharness.cpp
+@@ -11,6 +11,11 @@
+ // Agent mode (ARES_AGENT_DIR): screenshots → $ARES_AGENT_DIR/shots/guest-XXXX.ppm
+ // and one JSON line per screenshot/exit appended to $ARES_AGENT_DIR/events.jsonl.
+ //
++// FlashRAM saves (ROM header save type flashram): the run starts from an erased chip, or
++// from the 128 KB raw image ARES_FLASH_IN names; ARES_FLASH_OUT=<file> gets the chip's
++// image when the guest exits through this device (the exit does not run the emulator's
++// own save, which only autosaves every 30 s and at unload).
++//
+ // Register map (32-bit CPU accesses):
+ //   +0x00  CMD   (w): 1 = screenshot, 2 = exit
+ //   +0x04  ARG0  (w): screenshot: RDRAM byte address of framebuffer
+@@ -24,7 +29,13 @@
+ // Final VI dump lives in cpu/debugger.cpp (HostShot); linked via unity TU order.
+ auto agentDumpFinalShot() -> void;
+ 
++// Called from Cartridge::allocate() on cart boots, and lazily from the PI decode
++// so 64DD disk-only boots get the harness too -- those never connect a
++// cartridge, so allocate() never runs and the guest would have no way to report.
+ auto Cartridge::TestHarness::load() -> void {
++  if(probed) return;
++  probed = 1;
++
+   active = getenv("ARES_TEST_HARNESS") != nullptr;
+   shots = 0;
+   if(active) {
+@@ -36,6 +47,26 @@ auto Cartridge::TestHarness::load() -> void {
+     }
+     fflush(stdout);
+   }
++
++  //saved games (FlashRAM) of a run: a test run starts from an erased chip, or from the
++  //raw image ARES_FLASH_IN names, never from a <rom>.flash a previous run left beside the
++  //ROM; ARES_FLASH_OUT names the file the guest's exit writes the image to (exit does not
++  //go through the emulator's own save, see exitEmulator)
++  if(active && cartridge.flash.size) {
++    cartridge.flash.fill(~0u);
++    if(auto path = getenv("ARES_FLASH_IN")) {
++      FILE* fp = fopen(path, "rb");
++      u32 size = cartridge.flash.size;
++      if(!fp || fread(cartridge.flash.data, 1, size, fp) != size || fgetc(fp) != EOF) {
++        printf("TESTHARNESS flash in: %s is not a readable %u-byte image\n", path, size);
++        fflush(stdout);
++        ::_Exit(2);
++      }
++      fclose(fp);
++      printf("TESTHARNESS flash in %s (%u bytes)\n", path, size);
++      fflush(stdout);
++    }
++  }
+ }
+ 
+ auto Cartridge::TestHarness::readWord(u32 address) -> u32 {
+@@ -119,6 +150,20 @@ auto Cartridge::TestHarness::exitEmulator() -> void {
+   }
+   fflush(stdout);
+ 
++  if(auto path = getenv("ARES_FLASH_OUT")) {
++    if(cartridge.flash.size) {
++      FILE* fp = fopen(path, "wb");
++      if(fp && fwrite(cartridge.flash.data, 1, cartridge.flash.size, fp) == cartridge.flash.size && !fclose(fp)) {
++        printf("TESTHARNESS flash out %s (%u bytes)\n", path, (u32)cartridge.flash.size);
++      } else {
++        printf("TESTHARNESS flash out: cannot write %s\n", path);
++      }
++    } else {
++      printf("TESTHARNESS flash out: the ROM has no FlashRAM (N64_ROM_SAVETYPE=flashram)\n");
++    }
++    fflush(stdout);
++  }
++
+   if(Agent::active()) {
+     char text[96];
+     snprintf(text, sizeof(text), "TESTHARNESS exit %u", arg0);
+diff --git a/ares/n64/controller/gamepad/gamepad.cpp b/ares/n64/controller/gamepad/gamepad.cpp
+index 2da6bdeb8..eb83df8fb 100644
+--- a/ares/n64/controller/gamepad/gamepad.cpp
++++ b/ares/n64/controller/gamepad/gamepad.cpp
+@@ -432,6 +432,33 @@ auto Gamepad::read() -> n32 {
+     data.bit(28) = 0;  //Start
+   }
+ 
++  //test harness: merge injected state from the file named by ARES_TEST_INPUT.
++  //file holds one line: "<buttons-hex> <stick_x> <stick_y>", where buttons use
++  //this word's bit layout (bit31=A, 30=B, 29=Z, 28=Start, 27-24=dU/dD/dL/dR,
++  //21=L, 20=R, 19-16=cU/cD/cL/cR) and the stick is in raw -85..85 units.
++  static const char* injectPath = getenv("ARES_TEST_INPUT");
++  if(injectPath) {
++    if(FILE* fp = fopen(injectPath, "r")) {
++      unsigned buttons = 0; int sx = 0, sy = 0;
++      if(fscanf(fp, "%x %d %d", &buttons, &sx, &sy) >= 1) {
++        if(buttons || sx || sy) {
++          static u32 lastLogged = ~0u;
++          if(buttons != lastLogged) {
++            printf("TESTHARNESS inject buttons=%08x stick=%d,%d\n", buttons, sx, sy);
++            fflush(stdout);
++            lastLogged = buttons;
++          }
++        }
++        data = data | buttons;
++        if(sx || sy) {
++          data.byte(0) = s8(sy);
++          data.byte(1) = s8(sx);
++        }
++      }
++      fclose(fp);
++    }
++  }
++
+   return data;
+ }
+ 
+diff --git a/ares/n64/cpu/debugger.cpp b/ares/n64/cpu/debugger.cpp
+index 54ff45aab..13d1ba514 100644
+--- a/ares/n64/cpu/debugger.cpp
++++ b/ares/n64/cpu/debugger.cpp
+@@ -2,31 +2,53 @@
+ //   ARES_HOST_PRINTF=1            trap Randnet stubs; print [guest] lines
+ //   ARES_HOST_PRINTF=0xPC,...     custom trap PCs
+ //   ARES_HOST_SCREENSHOT=1        dump PPM at critical PCs (+ each printf if HOST_PRINTF)
++//   ARES_HOST_SHOT_EVERY_MS=N     also dump VI every N wall-clock ms while active
++//                                 (for full IPL→app boot reels; 0 = off)
++//   ARES_HOST_SHOT_MAX=N          cap periodic dumps (default 240)
+ //   ARES_HOST_SHOT_DIR=path       output directory (default: cwd, or $ARES_AGENT_DIR/shots)
+ //   ARES_AGENT_DIR / ARES_AGENT_FINAL_SHOT — farm agent paths + final.ppm
+ // Independent of ISViewer/SC64 — works for 64DD disk-only boots.
+ #include <n64/agent.hpp>
++#include <chrono>
+ 
+ namespace {
+   struct HostShot {
+     bool active = false;
+     bool finalDumped = false;
++    bool sawVi = false;
+     u32  index = 0;
++    u32  everyMs = 0;
++    u32  maxPeriodic = 240;
++    u32  periodicCount = 0;
++    u64  lastDumpMs = 0;
+     char dir[512] = ".";
+     // one-shot PCs (critical boot points)
+     static constexpr u32 crit[] = {
+-      0x8000'0400,  // disk IPL entry
++      0x8000'0400,  // disk payload entry (elfboot / flat boot after DD IPL)
++      0x8000'0460,  // early elfboot / stage
+       0x8004'42e4,  // boot hook
+       0x8000'0624,  // idle hang
+       0x8003'0b28,  // printf stub A
+       0x8003'0b3c,  // printf stub B
++      // common Japan DDIPL ROM window (KSEG1 cart/DD IPL space) — sampled
++      // via periodic dumps once VI is live, not only via these PCs
+     };
+     bool seen[sizeof(crit) / sizeof(crit[0])] = {};
+ 
++    static auto nowMs() -> u64 {
++      using namespace std::chrono;
++      return (u64)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
++    }
++
+     auto load() -> void {
+       active = false;
+       finalDumped = false;
++      sawVi = false;
+       index = 0;
++      everyMs = 0;
++      maxPeriodic = 240;
++      periodicCount = 0;
++      lastDumpMs = 0;
+       for(auto& s : seen) s = false;
+       Agent::hostShotDir(dir, sizeof(dir));
+ 
+@@ -35,6 +57,16 @@ namespace {
+         active = true;
+         print("[ares] ARES_HOST_SCREENSHOT → ", dir, "/*.ppm\n");
+       }
++      if(const char* p = ::getenv("ARES_HOST_SHOT_EVERY_MS"); p && p[0]) {
++        everyMs = (u32)strtoul(p, nullptr, 0);
++        if(everyMs && active) {
++          print("[ares] ARES_HOST_SHOT_EVERY_MS=", everyMs, "\n");
++        }
++      }
++      if(const char* p = ::getenv("ARES_HOST_SHOT_MAX"); p && p[0]) {
++        maxPeriodic = (u32)strtoul(p, nullptr, 0);
++        if(!maxPeriodic) maxPeriodic = 240;
++      }
+     }
+ 
+     // Write VI framebuffer to an explicit path. Returns true on success.
+@@ -118,6 +150,27 @@ namespace {
+           dump(tag);
+         }
+       }
++
++      // Periodic VI dumps: capture IPL splash → handoff → app without
++      // needing per-IPL PC maps. Only while VI is programmed.
++      if(everyMs && periodicCount < maxPeriodic) {
++        bool viLive = vi.io.colorDepth && vi.io.dramAddress && vi.io.width;
++        if(viLive && !sawVi) {
++          sawVi = true;
++          dump("vi-first");
++          lastDumpMs = nowMs();
++          periodicCount++;
++        } else if(viLive) {
++          u64 t = nowMs();
++          if(!lastDumpMs || t - lastDumpMs >= everyMs) {
++            lastDumpMs = t;
++            char tag[32];
++            snprintf(tag, sizeof(tag), "t%04u", periodicCount);
++            dump(tag);
++            periodicCount++;
++          }
++        }
++      }
+     }
+   } hostShot;
+ 
+diff --git a/ares/n64/dd/debugger.cpp b/ares/n64/dd/debugger.cpp
+index eeec1fe16..155de07a3 100644
+--- a/ares/n64/dd/debugger.cpp
++++ b/ares/n64/dd/debugger.cpp
+@@ -1,6 +1,22 @@
+ auto DD::Debugger::load(Node::Object parent) -> void {
+   tracer.interrupt = parent->append<Node::Debugger::Tracer::Notification>("Interrupt", "DD");
+   tracer.io = parent->append<Node::Debugger::Tracer::Notification>("I/O", "DD");
++  // Same ARES_TRACE_CPU modes as CPU debugger (stdout by default; file/both optional).
++  if(const char* e = ::getenv("ARES_TRACE_CPU"); e && e[0] && e[0] != '0') {
++    string mode = e;
++    bool toTerminal = mode != "file";
++    bool toFile = (mode == "file" || mode == "both");
++    tracer.interrupt->setPrefix(true);
++    tracer.io->setPrefix(true);
++    if(toTerminal) {
++      tracer.interrupt->setTerminal(true);
++      tracer.io->setTerminal(true);
++    }
++    if(toFile) {
++      tracer.interrupt->setFile(true);
++      tracer.io->setFile(true);
++    }
++  }
+ }
+ 
+ auto DD::Debugger::interrupt(u8 source) -> void {
+diff --git a/ares/n64/dd/rtc.cpp b/ares/n64/dd/rtc.cpp
+index 494c1f46e..81c2df2bc 100644
+--- a/ares/n64/dd/rtc.cpp
++++ b/ares/n64/dd/rtc.cpp
+@@ -7,11 +7,31 @@ auto DD::RTC::load() -> void {
+   //byte 0 to 7 = raw rtc time (last updated, only 6 bytes are used)
+   n64 check = 0;
+   for(auto n : range(8)) check.byte(n) = ram.read<Byte>(n);
+-  if(!~check) return;  //new save file
+ 
+-  //check for invalid time info, if invalid, set time info to something invalid and ignore the rest
+-  if (!valid()) {
+-    for(auto n : range(8)) ram.write<Byte>(n, 0xff);
++  // New or invalid RTC (all 0xFF / non-BCD): seed a valid host time.
++  // Retail DDIPL polls GetRTC* forever while the clock reads 0xFFFF and never
++  // proceeds to disk Start/ReadSeek — so an uninitialized RTC blocks boot.
++  if(!~check || !valid()) {
++    time_t t = time(0);
++    auto* tm = localtime(&t);
++    auto bcd = [](u32 n) -> u8 { return (u8)(((n / 10) << 4) | (n % 10)); };
++    // BCD layout: year, month, day, hour, minute, second (see valid()/tickSecond)
++    u32 year = tm ? (u32)(tm->tm_year % 100) : 99;  // 0-99 BCD year
++    u32 mon  = tm ? (u32)(tm->tm_mon + 1) : 1;
++    u32 day  = tm ? (u32)tm->tm_mday : 1;
++    u32 hour = tm ? (u32)tm->tm_hour : 0;
++    u32 min  = tm ? (u32)tm->tm_min : 0;
++    u32 sec  = tm ? (u32)tm->tm_sec : 0;
++    ram.write<Byte>(0, bcd(year));
++    ram.write<Byte>(1, bcd(mon));
++    ram.write<Byte>(2, bcd(day));
++    ram.write<Byte>(3, bcd(hour));
++    ram.write<Byte>(4, bcd(min));
++    ram.write<Byte>(5, bcd(sec));
++    ram.write<Byte>(6, 0);
++    ram.write<Byte>(7, 0);
++    n64 now = (n64)t;
++    for(auto n : range(8)) ram.write<Byte>(8 + n, now.byte(n));
+     return;
+   }
+ 
+diff --git a/ares/n64/pi/bus.hpp b/ares/n64/pi/bus.hpp
+index 01f50b30b..b5ae0139f 100644
+--- a/ares/n64/pi/bus.hpp
++++ b/ares/n64/pi/bus.hpp
+@@ -45,10 +45,26 @@ inline auto PI::busRead(u32 address) -> u32 {
+     if(cartridge.flash) return cartridge.flash.read<Size>(address);
+     return unmapped;
+   }
+-  if(cartridge.isviewer.enabled() && address >= 0x13ff'0000 && address <= 0x13ff'ffff) {
++  //ISViewer (dev cart) lives at PI 0x13ff0000-0x13ffffff: registers at
++  //0x13ff0000-0x13ff001f, write-only buffer above. A cartridge image larger
++  //than 0x3ff0000 (64 MiB - 64 KiB) covers that range, and the
++  //harness/ARES_ISVIEWER path force-enables the device at any ROM size (so
++  //homebrew with a fat ROM can still log). Only the register reads may come
++  //from the device (libdragon probes the magic at +0x00, libultra reads the
++  //buffer pointers); the buffer half of the window is cart data, otherwise
++  //every asset stored there reads back as ISViewer RAM (zeros).
++  if(cartridge.isviewer.enabled()
++  && ((address >= 0x13ff'0000 && address <= 0x13ff'001f)
++   || (address >= 0x13ff'0020 && address <= 0x13ff'ffff
++    && address > 0x1000'0000 + cartridge.rom.size - 1))) {
+     return cartridge.isviewer.read<Size>(address);
+   }
+-  if(address >= 0x13fe'0000 && address <= 0x13fe'0fff) {
++  //Test harness: registers at 0x13fe0000-0x13fe001f (only +0x10 is readable),
++  //rest of the 4 KiB window is scratch. As with ISViewer above, a ROM larger
++  //than 64 MiB reaches into this window, so only the register block is taken
++  //from the device; the remaining bytes stay cart data.
++  if(address >= 0x13fe'0000 && address <= 0x13fe'0fff
++  && (address <= 0x13fe'001f || address > 0x1000'0000 + cartridge.rom.size - 1)) {
+     cartridge.testharness.load();  //idempotent; enables it on DD-only boots
+     if(cartridge.testharness.enabled()) {
+       if constexpr(Size == Word) return cartridge.testharness.readWord(address);

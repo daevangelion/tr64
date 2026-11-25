@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Whole CORE video, no level resident (seed 0 = play to the end).
+scene video-core
+start boot
+load level core
+probe video
+ticks 1
+seed 0
+observe log "^video-probe: name=core result=1 pictures=165 returned=1$"
+observe pools
+observe placement

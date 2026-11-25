@@ -1,0 +1,24 @@
+{
+  "level": "LEVEL1",
+  "rest_models": [
+    26,
+    27,
+    16,
+    15
+  ],
+  "live_item": 0,
+  "posed_game_camera": true,
+  "camera": {
+    "room": 14,
+    "position": [
+      28160,
+      5376,
+      53760
+    ],
+    "target": [
+      20247,
+      5376,
+      51640
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT
+# CANYON through END whole, one after the other, no level resident: the tail of the
+# all-videos census when a host load too high for one run to finish in its deadline
+# splits it (`<name>-on` plays that video and every later one).
+scene video-canyon-end
+start boot
+load level canyon-on
+probe video
+ticks 1
+seed 0
+observe log "^video-probe: name=canyon-on result=1 "
+observe pools
+observe placement

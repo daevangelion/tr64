@@ -1,0 +1,9 @@
+{
+  "level": "gym",
+  "hud": true,
+  "camera": {
+    "room": 14,
+    "position": [40448, 3684, 60828],
+    "target": [40448, 3684, 60928]
+  }
+}

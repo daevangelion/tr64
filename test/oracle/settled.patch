@@ -1,0 +1,517 @@
+--- a/src/fixed/common.h
++++ b/src/fixed/common.h
+@@ -2761,6 +2761,15 @@
+ bool coopTriggerBlocked(const ItemObj* item,unsigned type);
+ void coopFinishInteraction(Lara* lara);
+ void coopRememberPose(const Lara* lara);
++struct CoopRetiredAction { const FloorData* trigger; uint16 ticks; uint8 slot; };
++extern CoopRetiredAction gCoopRetired[MAX_ITEMS];
++extern unsigned gCoopRetiredCount;
++extern bool gCoopRetireLevel;
++extern uint32 gCoopBlocks[(MAX_ITEMS+31)/32];
++struct CoopKeyAnim { uint16 anim, frame; uint8 state, goal; };
++extern CoopKeyAnim gCoopKeyAnim[MAX_PLAYERS];
++void coopRetireInteraction(ItemObj* owner, ItemObj* item, unsigned slot);
++void coopSettleInteractions();
+ extern uint16 gCoopPickups[MAX_ITEMS];
+ extern unsigned gCoopPickupCount;
+ int32 coopSelectedUse(const Lara* lara);
+--- a/src/fixed/game.h
++++ b/src/fixed/game.h
+@@ -482,6 +482,7 @@
+ bool gameSave()
+ {
+     SaveGame candidate;
++    if (gCoopRetiredCount || gCoopRetireLevel)return false;
+     if (!gameBuildSaveV3(candidate, gSaveData, sizeof(gSaveData)) ||
+         !osSaveGame(candidate, gSaveData))
+         return false;
+@@ -553,34 +554,17 @@
+     ItemObj* item=claim;
+     if (!item)return;
+     claim=NULL;
+-    unsigned status=item->flags&ITEM_FLAG_STATUS;
+-    if (status==ITEM_FLAG_STATUS_ACTIVE) {
+-        if (item->type>=ITEM_PUZZLEHOLE_1 && item->type<=ITEM_PUZZLEHOLE_4) {
+-            item->type=worldPuzzleHoleDoneType(ItemType(item->type),item->flags);
+-            return;
+-        }
+-        if (item->type==ITEM_SWITCH || item->type==ITEM_SWITCH_WATER ||
+-            (item->type>=ITEM_BLOCK_1 && item->type<=ITEM_BLOCK_4)) {
+-            for (unsigned frame=0;frame<4096;++frame) {
+-                item->update();
+-                if (!(item->flags&ITEM_FLAG_ACTIVE) ||
+-                    (item->flags&ITEM_FLAG_STATUS)!=ITEM_FLAG_STATUS_ACTIVE)return;
+-            }
+-            ASSERT(false);
+-        }
+-    }
+-    // Authored FX_FINISH_LEVEL in the two Scion interaction animations (hunk 13).
+-    if ((item->type==ITEM_SCION_PICKUP_HOLDER && gLevelID==LVL_TR1_10B) ||
+-        (item->type==ITEM_SCION_PICKUP_QUALOPEC && gLevelID==LVL_TR1_8C &&
+-         (status==ITEM_FLAG_STATUS_INVISIBLE || status==ITEM_FLAG_STATUS_INACTIVE)))
+-        completeLevel(owner);
++    coopRetireInteraction(owner,item,owner==players[1]);
+ }
+ 
+ static bool coopGetPose(const Lara* partner,CoopPose &pose)
+ {
++    pose=gCoopPose[partner==players[1]];
++    if (coopPoseUsable(pose))return true;
+     coopRememberPose(partner);
+     pose=gCoopPose[partner==players[1]];
+-    return coopPoseUsable(pose);
++    if (coopPoseUsable(pose))return true;
++    return coopNearestPose(partner,pose);
+ }
+ 
+ static void coopApplyMedium(Lara* lara,const CoopPose &pose)
+@@ -796,6 +780,10 @@
+         gLaraHazardState[i]=LaraHazardState();
+     }
+     gCoopPickupCount=0;
++    memset(gCoopBlocks,0,sizeof(gCoopBlocks));
++    memset(gCoopRetired,0,sizeof(gCoopRetired));
++    gCoopRetiredCount=0;
++    gCoopRetireLevel=false;
+     gCoopCollisionOffset=_vec3i(0,0,0);
+ 
+     if (gLevelID == LVL_TR1_TITLE) {
+@@ -1661,6 +1649,7 @@
+     if (players[1])
+         for (int slot=0;slot<MAX_PLAYERS;++slot)
+             if (players[slot]->health<=0)coopFinishInteraction(players[slot]);
++    if (gCoopRetiredCount)coopSettleInteractions();
+ 
+     if (isCutsceneLevel())
+     {
+@@ -2514,6 +2503,10 @@
+         updateSimulationTicks(frames);
+         updateLevel(frames);
+     }
++    if (gCoopRetireLevel && inventory.state==INV_STATE_NONE && gNextLevel==LVL_MAX) {
++        gCoopRetireLevel=false;
++        completeLevel(players[0]);
++    }
+ 
+     if ((gNextLevel != LVL_MAX) && (inventory.state == INV_STATE_NONE))
+     {
+--- a/src/fixed/lara.h
++++ b/src/fixed/lara.h
+@@ -4243,6 +4243,8 @@
+             extraL->healthTimer--;
+         }
+         coopRememberPose(this);
++        if (health>0 && (state==STATE_USE_KEY || state==STATE_USE_PUZZLE))
++            gCoopKeyAnim[this==players[1]]={animIndex,frameIndex,state,goalState};
+         if (players[1] && health<=0)coopFinishInteraction(this);
+         ItemObj*& claim=gCoopInteraction[this==players[1]];
+         if (claim && inventory.state==INV_STATE_NONE) {
+@@ -4688,18 +4690,76 @@
+     }
+     return false;
+ }
+-static bool coopPoseUsable(const CoopPose &pose)
++static bool coopPoseBounds(Room *room,vec3i p,int32 *floor,int32 *ceiling,int32 *water)
+ {
+-    if (!pose.at.room)return false;
+-    if (pose.water!=WATER_STATE_ABOVE && pose.water!=WATER_STATE_WADE)return true;
+-    const vec3i p=pose.at.pos;
+-    const Sector* s=pose.at.room->getSector(p.x,p.z);
+-    const FloorData* trigger=gLastFloorData;
+-    const uint16 slant=gLastFloorSlant;
+-    const int32 floor=s->getFloor(p.x,p.y,p.z), ceiling=s->getCeiling(p.x,p.y,p.z);
++    if (!room)return false;
++    const RoomInfo *info=room->info;
++    int32 sx=(p.x-(info->x*256))>>10, sz=(p.z-(info->z*256))>>10;
++    if (sx<0 || sz<0 || sx>=info->xSectors || sz>=info->zSectors)
++        return false;
++    const Sector *s=room->getSector(p.x,p.z);
++    const FloorData *trigger=gLastFloorData;
++    uint16 slant=gLastFloorSlant;
++    *floor=s->getFloor(p.x,p.y,p.z);
++    *ceiling=s->getCeiling(p.x,p.y,p.z);
++    const Sector *surface=room->getWaterSector(p.x,p.z);
++    *water=!surface ? WALL : surface->roomAbove!=NO_ROOM ? surface->ceiling*256 :
++        surface->getCeiling(p.x,p.y,p.z);
+     gLastFloorData=trigger;
+     gLastFloorSlant=slant;
+-    return floor!=WALL && ceiling!=WALL && p.y<=floor && p.y-ceiling>=LARA_HEIGHT;
++    return *floor!=WALL && *ceiling!=WALL;
++}
++static bool coopPoseUsable(const CoopPose &pose)
++{
++    vec3i p=pose.at.pos;
++    Room *room=pose.at.room;
++    int32 floor,ceiling,water;
++    if (!coopPoseBounds(room,p,&floor,&ceiling,&water))return false;
++    bool wet=ROOM_FLAG_WATER(room->info->flags);
++    if (pose.water==WATER_STATE_UNDER)
++        return wet && water!=WALL && p.y>=water &&
++            p.y-ceiling>=LARA_HEIGHT_UW/2 && floor-p.y>=LARA_HEIGHT_UW/2 &&
++            room->getRoom(p.x,p.y,p.z)==room;
++    if (pose.water==WATER_STATE_SURFACE)
++        return water!=WALL && p.y==water+1 && ceiling<=p.y &&
++            floor-p.y>=LARA_HEIGHT_SURF;
++    unsigned ground=water!=WALL && floor-water>LARA_STEP_HEIGHT ? WATER_STATE_WADE : WATER_STATE_ABOVE;
++    return pose.water==ground && (ground!=WATER_STATE_WADE || floor-water<=730) &&
++        p.y==floor && p.y-ceiling>=LARA_HEIGHT && room->getRoom(p.x,p.y-1,p.z)==room;
++}
++static bool coopNearestPose(const Lara *partner,CoopPose &out)
++{
++    Room *room=partner->room;
++    if (!room)return false;
++    const RoomInfo *info=room->info;
++    bool found=false;
++    uint64_t best=UINT64_MAX;
++    for (unsigned x=0;x<info->xSectors;++x)
++        for (unsigned z=0;z<info->zSectors;++z) {
++            vec3i p={(info->x*256)+(int32)x*1024+512,partner->pos.y,
++                     (info->z*256)+(int32)z*1024+512};
++            int32 floor,ceiling,water;
++            if (!coopPoseBounds(room,p,&floor,&ceiling,&water))continue;
++            uint8 medium=WATER_STATE_ABOVE;
++            if (water!=WALL && floor-water>730) {
++                medium=WATER_STATE_UNDER;
++                p.y=X_MAX(X_MAX(water,ceiling)+LARA_HEIGHT_UW/2,X_MIN(p.y,floor-LARA_HEIGHT_UW/2));
++            } else {
++                p.y=floor;
++                if (water!=WALL && floor-water>LARA_STEP_HEIGHT)medium=WATER_STATE_WADE;
++            }
++            int64_t dx=(int64_t)p.x-partner->pos.x,dy=(int64_t)p.y-partner->pos.y,dz=(int64_t)p.z-partner->pos.z;
++            uint64_t distance=(uint64_t)(dx*dx)+(uint64_t)(dy*dy)+(uint64_t)(dz*dz);
++            if (distance>=best)continue;
++            Room* landing=room->getRoom(p.x,p.y-(medium!=WATER_STATE_UNDER),p.z);
++            const CoopPose candidate={{landing,p},partner->angle.y,medium};
++            if (coopPoseUsable(candidate)) {
++                best=distance;
++                out=candidate;
++                found=true;
++            }
++        }
++    return found;
+ }
+ void coopRememberPose(const Lara* lara)
+ {
+--- a/src/fixed/object.h
++++ b/src/fixed/object.h
+@@ -1250,7 +1250,8 @@
+ 
+     bool use(ItemObj* lara)
+     {
+-        if (((flags & ITEM_FLAG_STATUS) == ITEM_FLAG_STATUS_ACTIVE) && (lara->extraL->weaponState == WEAPON_STATE_FREE)) // TODO check weapons
++        if ((flags & ITEM_FLAG_STATUS)==ITEM_FLAG_STATUS_ACTIVE &&
++            (!lara || lara->extraL->weaponState==WEAPON_STATE_FREE))
+         {
+             flags &= ~ITEM_FLAG_STATUS;
+             flags |= ITEM_FLAG_STATUS_INACTIVE;
+@@ -1432,6 +1433,7 @@
+                 lara->moveTo(_vec3i(0, 0, offset), this, false);
+                 lara->animSkip(stateUse, Lara::STATE_STOP);
+                 lara->extraL->weaponState = WEAPON_STATE_BUSY;
++                gCoopKeyAnim[lara==players[1]]={lara->animIndex,lara->frameIndex,lara->state,lara->goalState};
+                 flags &= ~ITEM_FLAG_STATUS;
+                 flags |= ITEM_FLAG_STATUS_ACTIVE;
+                 return;
+@@ -1790,6 +1792,10 @@
+             activate();
+             flags &= ~ITEM_FLAG_STATUS;
+             flags |= ITEM_FLAG_STATUS_ACTIVE;
++            if (players[1]) {
++                unsigned index=static_cast<ItemObj*>(this)-items;
++                gCoopBlocks[index/32]|=1u<<(index%32);
++            }
+ 
+             animProcess();
+             lara->animProcess();
+@@ -1821,10 +1827,13 @@
+ 
+     virtual void update()
+     {
++        const unsigned index=static_cast<ItemObj*>(this)-items;
++        uint32 &moving=gCoopBlocks[index/32], mask=1u<<(index%32);
+         if (flags & ITEM_FLAG_ONCE)
+         {
+             updateFloor(1024);
+             remove();
++            moving &= ~mask;
+             return;
+         }
+ 
+@@ -1832,12 +1841,19 @@
+ 
+         updateRoom(); // it'll get roomFloor and gLastFloorData
+ 
+-        if (pos.y > roomFloor)
+-        {
++        if (moving & mask) {
++            if (pos.y<roomFloor) {
++                flags=(flags&~ITEM_FLAG_STATUS)|ITEM_FLAG_STATUS_ACTIVE|ITEM_FLAG_GRAVITY;
++                return;
++            }
++            if (flags&ITEM_FLAG_GRAVITY) {
++                flags=(flags&~(ITEM_FLAG_STATUS|ITEM_FLAG_GRAVITY))|ITEM_FLAG_STATUS_INACTIVE;
++                pos.y=roomFloor;
++                vSpeed=0;
++            }
++        } else if (pos.y > roomFloor) {
+             flags |= ITEM_FLAG_GRAVITY;
+-        }
+-        else if (flags & ITEM_FLAG_GRAVITY)
+-        {
++        } else if (flags & ITEM_FLAG_GRAVITY) {
+             flags &= ~(ITEM_FLAG_GRAVITY | ITEM_FLAG_STATUS);
+             flags |= ITEM_FLAG_STATUS_INACTIVE;
+             pos.y = roomFloor;
+@@ -1846,6 +1862,7 @@
+ 
+         if ((flags & ITEM_FLAG_STATUS) == ITEM_FLAG_STATUS_INACTIVE)
+         {
++            moving &= ~mask;
+             deactivate();
+             flags &= ~ITEM_FLAG_STATUS;
+ 
+--- a/src/fixed/room.h
++++ b/src/fixed/room.h
+@@ -940,7 +940,7 @@
+     }
+ }
+ 
+-void checkTrigger(const FloorData* fd, ItemObj* lara)
++static void checkTriggerInternal(const FloorData* fd,ItemObj* lara,int retiredSlot)
+ {
+ #if defined(OPENLARA_HOST_HAZARD_TEST)
+     fixedHazardObserveTrigger();
+@@ -967,24 +967,28 @@
+     ItemObj* cameraItem = NULL;
+     int16 effectID = -1;
+ 
++    ItemObj* owner=retiredSlot<0 ? lara : (ItemObj*)players[retiredSlot];
++    const unsigned type=FD_TRIGGER_TYPE(cmd);
++    if (retiredSlot<0 && gCoopRetiredCount &&
++        (type==TRIGGER_TYPE_SWITCH || type==TRIGGER_TYPE_KEY || type==TRIGGER_TYPE_PICKUP) &&
++        FD_ARGS(*fd)<level.itemsCount && gCoopRetired[FD_ARGS(*fd)].trigger)return;
+     if (lara && players[1]) {
+-        unsigned type=FD_TRIGGER_TYPE(cmd);
+         if ((type==TRIGGER_TYPE_KEY || type==TRIGGER_TYPE_SWITCH) &&
+             coopTriggerBlocked(items+FD_ARGS(*fd),type))return;
+         if (type==TRIGGER_TYPE_PICKUP &&
+             (items[FD_ARGS(*fd)].flags&ITEM_FLAG_STATUS)!=ITEM_FLAG_STATUS_INVISIBLE)return;
+     }
+ 
+-    Camera* camera = lara ? &lara->extraL->camera : &playersExtra[0].camera;
++    Camera* camera = lara ? &lara->extraL->camera : &playersExtra[retiredSlot<0 ? 0 : retiredSlot].camera;
+ 
+     if (camera->mode != CAMERA_MODE_OBJECT) {
+         checkCamera(fd, camera);
+     }
+ 
+-    if (!lara && FD_TRIGGER_TYPE(cmd) != TRIGGER_TYPE_OBJECT)
++    if (!lara && retiredSlot<0 && type!=TRIGGER_TYPE_OBJECT)
+         return;
+ 
+-    if (lara)
++    if (lara || retiredSlot>=0)
+     {
+         switch (FD_TRIGGER_TYPE(cmd))
+         {
+@@ -1114,13 +1118,13 @@
+                     }
+                 
+                     camera->speed = (FD_SPEED(cam) << 3) + 1;
+-                    camera->mode = lara ? CAMERA_MODE_FIXED : CAMERA_MODE_OBJECT;
++                    camera->mode = lara || retiredSlot>=0 ? CAMERA_MODE_FIXED : CAMERA_MODE_OBJECT;
+                 }
+                 break;
+             }
+ 
+             case TRIGGER_ACTION_FLOW:
+-                worldSetFlow(FD_ARGS(triggerCmd),lara && lara==(void*)players[1]);
++                if (retiredSlot<0 || owner)worldSetFlow(FD_ARGS(triggerCmd),owner && owner==(void*)players[1]);
+                 break;
+ 
+             case TRIGGER_ACTION_FLIP:
+@@ -1139,12 +1143,13 @@
+             }
+ 
+             case TRIGGER_ACTION_END:
+-                completeLevel(lara);
++                if (retiredSlot>=0)gCoopRetireLevel=true;
++                else completeLevel(lara);
+                 break;
+ 
+             case TRIGGER_ACTION_SOUNDTRACK:
+             {
+-                int32 track = doTutorial(lara, FD_ARGS(triggerCmd));
++                int32 track = doTutorial(owner, FD_ARGS(triggerCmd));
+ 
+                 if (track == 0) break;
+ 
+@@ -1207,7 +1212,7 @@
+ 
+     bool flipCommitted = worldApplyPendingFlip();
+     if (effectID >= 0)
+-        worldDispatchEffect(uint16(effectID), (Lara*)lara, flipCommitted);
++        worldDispatchEffect(uint16(effectID), (Lara*)owner, flipCommitted);
+ 
+     if (cameraItem && (camera->mode == CAMERA_MODE_FIXED || camera->mode == CAMERA_MODE_OBJECT))
+     {
+@@ -1215,4 +1220,146 @@
+     }
+ }
+ 
++CoopRetiredAction gCoopRetired[MAX_ITEMS];
++unsigned gCoopRetiredCount;
++bool gCoopRetireLevel;
++uint32 gCoopBlocks[(MAX_ITEMS+31)/32];
++CoopKeyAnim gCoopKeyAnim[MAX_PLAYERS];
++
++void checkTrigger(const FloorData* fd,ItemObj* lara)
++{
++    checkTriggerInternal(fd,lara,-1);
++}
++
++static uint16 coopTicksToFreeHands(const CoopKeyAnim &key)
++{
++    ItemObj cursor;
++    cursor.animIndex=key.anim;
++    cursor.frameIndex=key.frame;
++    cursor.state=key.state;
++    cursor.goalState=key.goal;
++    const Anim* anim=level.anims+cursor.animIndex;
++    for (uint16 tick=1;tick<4096;++tick) {
++        ++cursor.frameIndex;
++        anim=cursor.animChange(anim);
++        const bool end=cursor.frameIndex>anim->frameEnd;
++        for (unsigned pass=0;pass<1u+unsigned(end);++pass) {
++            if (pass) {
++                cursor.frameIndex=anim->nextFrameIndex;
++                cursor.animIndex=anim->nextAnimIndex;
++                anim=level.anims+cursor.animIndex;
++                cursor.state=anim->state;
++            }
++            const int16* p=level.animCommands+anim->commandsStart;
++            for (unsigned i=0;i<anim->commandsCount;++i) {
++                switch (*p++) {
++                case ANIM_CMD_OFFSET: p+=3; break;
++                case ANIM_CMD_JUMP: case ANIM_CMD_SOUND: p+=2; break;
++                case ANIM_CMD_EMPTY: if (end && !pass)return tick; break;
++                case ANIM_CMD_EFFECT:
++                    if ((!end || pass) && cursor.frameIndex==p[0] && p[1]==FX_LARA_HANDSFREE)return tick;
++                    p+=2;
++                    break;
++                }
++            }
++        }
++    }
++    ASSERT(false);
++    return 1;
++}
++
++static const FloorData* coopLinkedTrigger(Room* room,const vec3i &pos,unsigned type,unsigned item)
++{
++    const FloorData* scratch=gLastFloorData;
++    const uint16 slant=gLastFloorSlant;
++    room->getSector(pos.x,pos.z)->getFloor(pos.x,pos.y,pos.z);
++    const FloorData* fd=gLastFloorData;
++    gLastFloorData=scratch;
++    gLastFloorSlant=slant;
++    if (fd && FD_FLOOR_TYPE(*fd)==FLOOR_TYPE_LAVA) {
++        if (FD_END(*fd))return NULL;
++        ++fd;
++    }
++    return fd && unsigned(FD_TRIGGER_TYPE(fd[0]))==type && unsigned(FD_ARGS(fd[2]))==item ? fd : NULL;
++}
++
++static const FloorData *coopFindLinkedTrigger(vec3i pos,unsigned type,unsigned item)
++{
++    const FloorData *best=NULL;
++    uint64_t distance=UINT64_MAX;
++    for (unsigned r=0;r<level.roomsCount;++r) {
++        const Room *room=rooms+r;
++        const RoomInfo *info=room->info;
++        unsigned nx=info->xSectors,nz=info->zSectors;
++        for (unsigned i=0;i<nx*nz;++i) {
++            unsigned offset=room->sectors[i].floorIndex;
++            if (!offset)continue;
++            const FloorData *fd=level.floors+offset;
++            for (;;) {
++                uint16 cmd=*fd;
++                unsigned kind=cmd&31;
++                if (kind==FLOOR_TYPE_TRIGGER) {
++                    if (FD_TRIGGER_TYPE(cmd)==type && unsigned(FD_ARGS(fd[2]))==item) {
++                        int64_t dx=(int64_t)(info->x*256)+(i/nz)*1024+512-pos.x;
++                        int64_t dz=(int64_t)(info->z*256)+(i%nz)*1024+512-pos.z;
++                        uint64_t d=(uint64_t)(dx*dx)+(uint64_t)(dz*dz);
++                        if (d<distance) { best=fd; distance=d; }
++                    }
++                    break;
++                }
++                if (FD_END(cmd))break;
++                if (kind==FLOOR_TYPE_LAVA)++fd;
++                else if (kind==FLOOR_TYPE_PORTAL || kind==FLOOR_TYPE_FLOOR || kind==FLOOR_TYPE_CEILING)fd+=2;
++                else break;
++            }
++        }
++    }
++    return best;
++}
++
++void coopRetireInteraction(ItemObj* owner,ItemObj* item,unsigned slot)
++{
++    const unsigned type=item->type,status=item->flags&ITEM_FLAG_STATUS,index=item-items;
++    unsigned trigger,wait=0;
++    if ((type==ITEM_SCION_PICKUP_HOLDER && gLevelID==LVL_TR1_10B) ||
++        (type==ITEM_SCION_PICKUP_QUALOPEC && gLevelID==LVL_TR1_8C &&
++         (status==ITEM_FLAG_STATUS_INVISIBLE || status==ITEM_FLAG_STATUS_INACTIVE)))
++        gCoopRetireLevel=true;
++    if ((type==ITEM_SWITCH || type==ITEM_SWITCH_WATER) &&
++        (status==ITEM_FLAG_STATUS_ACTIVE || status==ITEM_FLAG_STATUS_INACTIVE))
++        trigger=TRIGGER_TYPE_SWITCH;
++    else if (status==ITEM_FLAG_STATUS_ACTIVE &&
++             ((type>=ITEM_KEYHOLE_1 && type<=ITEM_KEYHOLE_4) ||
++              (type>=ITEM_PUZZLEHOLE_1 && type<=ITEM_PUZZLEHOLE_DONE_4))) {
++        trigger=TRIGGER_TYPE_KEY;
++        wait=owner->health>0 && owner->extraL->weaponState==WEAPON_STATE_FREE ? 1 :
++            coopTicksToFreeHands(gCoopKeyAnim[slot]);
++        if (type<=ITEM_PUZZLEHOLE_4 && type>=ITEM_PUZZLEHOLE_1)
++            item->type+=ITEM_PUZZLEHOLE_DONE_1-ITEM_PUZZLEHOLE_1;
++    } else if (status==ITEM_FLAG_STATUS_INVISIBLE)
++        trigger=TRIGGER_TYPE_PICKUP;
++    else return;
++    const FloorData* fd=coopLinkedTrigger(owner->room,owner->pos,trigger,index);
++    if (!fd && item->room)fd=coopLinkedTrigger(item->room,item->pos,trigger,index);
++    if (!fd && trigger!=TRIGGER_TYPE_PICKUP)fd=coopFindLinkedTrigger(owner->pos,trigger,index);
++    if (fd && !gCoopRetired[index].trigger) {
++        gCoopRetired[index]={fd,uint16(wait),uint8(slot)};
++        ++gCoopRetiredCount;
++    }
++}
++
++void coopSettleInteractions()
++{
++    for (unsigned i=0;i<level.itemsCount && gCoopRetiredCount;++i) {
++        CoopRetiredAction &p=gCoopRetired[i];
++        if (!p.trigger || (p.ticks && --p.ticks))continue;
++        if (FD_TRIGGER_TYPE(p.trigger[0])==TRIGGER_TYPE_SWITCH &&
++            (items[i].flags&ITEM_FLAG_STATUS)!=ITEM_FLAG_STATUS_INACTIVE)continue;
++        const CoopRetiredAction action=p;
++        p=CoopRetiredAction();
++        --gCoopRetiredCount;
++        checkTriggerInternal(action.trigger,NULL,action.slot);
++    }
++}
++
+ #endif
+--- a/src/fixed/world_persistence.h
++++ b/src/fixed/world_persistence.h
+@@ -5,7 +5,8 @@
+ 
+ inline ItemType worldPuzzleHoleDoneType(ItemType type, uint16 flags)
+ {
+-    if ((flags & ITEM_FLAG_STATUS) != ITEM_FLAG_STATUS_ACTIVE)
++    const unsigned status=flags&ITEM_FLAG_STATUS;
++    if (status!=ITEM_FLAG_STATUS_ACTIVE && status!=ITEM_FLAG_STATUS_INACTIVE)
+         return type;
+ 
+     switch (type)

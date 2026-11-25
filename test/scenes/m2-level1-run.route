@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# First75 ticks of the canonical150-tick FORWARD fixture; capture mid-run.
+scene m2-level1-run
+start boot
+load level level1
+game
+ticks 75
+seed 1
+at 0 pad 8 0 0
+observe log "^game-render: .* entities=[1-9][0-9]* "
+observe pools
+observe placement

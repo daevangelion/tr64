@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# All eleven videos whole, one after the other, no level resident: the
+# slow-picture census (the video: log lines carry the per-video counters).
+scene video-all
+start boot
+load level all
+probe video
+ticks 1
+seed 0
+observe log "^video-probe: name=all result=1 "
+observe pools
+observe placement

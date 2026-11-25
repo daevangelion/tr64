@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Whole vision video, no level resident: decode time, drops, underruns, sync.
+scene video-vision
+start boot
+load level vision
+probe video
+ticks 1
+seed 0
+observe log "^video-probe: name=vision result=1 "
+observe pools
+observe placement

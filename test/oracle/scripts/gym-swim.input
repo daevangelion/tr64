@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Pool rim in room 13: swan dive into water room 14, swim, ascend, tread.
+start 13 40448 3328 57856 0
+hold FORWARD+WALK+JUMP 45
+hold BACK+JUMP 85
+hold JUMP 30
+hold NONE 70

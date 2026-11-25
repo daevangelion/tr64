@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: MIT
+# Metadata/cache/dispatch stay resident; all storage work and SDK SRAM calls are cold.
+medium *engine/save/medium.o *plat/n64/save.o *plat/host/save.o *sram.o

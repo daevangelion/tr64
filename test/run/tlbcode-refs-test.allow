@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+# Resident references into a code unit that exist only in builds linking test
+# sources (TR64_SCENE_TEST_SOURCES); the Makefile passes this list to
+# test/run/refs-check.py as --extra-allow only then, so no shipping build can
+# use it. Format: test/run/tlbcode-refs.allow.
+#
+# The nested-fault probe (plat/n64/fatal-nested-probe.c) takes the address of
+# the test unit's function to find and corrupt that unit's TLB mapping on
+# purpose; it never runs outside the fatal control that loads the unit first.
+.text:tr64_fatal_test_nested -> test:tr64_unit_test  # fatal-tests.py "nested" control only

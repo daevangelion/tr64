@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Retail start; canonical idle fixture's60 ticks, no placement/camera override.
+scene m2-level1-idle
+start boot
+load level level1
+game
+ticks 60
+seed 1
+observe log "^game-render: .* entities=[1-9][0-9]* "
+observe pools
+observe placement

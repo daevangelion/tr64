@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+scene music-level1-start
+start boot
+load level level1
+game
+ticks 180
+seed 1
+observe log "^music: starts=1 loops=0 unavailable=0 underruns=0 .*current=5 phase=5$"
+observe pools
+observe placement

@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA; src/fixed/enemy.h, object.h, inventory.h and save_v3.h at 2333adef30ae2a5f3b32c5355e6e343d6aa0531a.
+objects *game/object_dispatch.o *game/object_interact.o *game/object_block.o *game/object_trap.o *game/object_progression.o *game/hazard_dispatch.o *game/hazard_boulder.o *game/hazard_contact.o *game/hazard_thor_lightning.o *game/hazard_flame.o
+enemy_peru *game/unit_peru.o *game/enemy_wolf.o *game/enemy_bear.o *game/enemy_bat.o
+enemy_greece *game/unit_greece.o *game/enemy_crocodile.o *game/enemy_lion.o *game/enemy_gorilla.o
+enemy_rat *game/enemy_rat.o
+enemy_dinosaurs *game/unit_dinosaurs.o *game/enemy_rex.o *game/enemy_raptor.o
+enemy_mutant *game/enemy_mutant.o
+enemy_atlanteans *game/unit_atlanteans.o *game/enemy_centaur.o *game/enemy_mummy.o
+enemy_gunmen *game/unit_gunmen.o *game/enemy_larson.o *game/enemy_pierre.o
+enemy_henchmen *game/unit_henchmen.o *game/enemy_skater.o *game/enemy_cowboy.o *game/enemy_mrt.o
+enemy_natla *game/enemy_natla.o
+enemy_adam *game/enemy_adam.o
+enemy_doppelganger *game/enemy_doppelganger.o
+enemy_encounter *game/enemy_encounter.o
+inv *game/inventory.o *game/inventory-view.o
+save *game/save.o

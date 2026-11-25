@@ -1,0 +1,9 @@
+{
+  "level": "LEVEL6",
+  "camera": {
+    "room": 25,
+    "position": [33792, -6000, 48128],
+    "target": [33792, -9000, 48129],
+    "flipped": 1
+  }
+}

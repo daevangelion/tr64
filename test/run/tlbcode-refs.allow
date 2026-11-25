@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+# Resident references into a code unit that test/run/refs-check.py accepts
+# (docs/architecture.md section 6). The dispatch rows (`.data:units ->
+# <unit>:tr64_unit_<unit>`) are built in. Format and `callers=` rule: see the
+# script. Addresses are not part of an entry.
+#
+# The video unit holds the SDK's H.264 decoder, YUV converter and their RSP
+# microcode. The SDK defines the descriptors below in resident `.data` and they
+# point at blobs that live in the unit, and `rdpq_set_mode_yuv` is SDK code in
+# resident text that reads the unit's colour table. All of them are reachable
+# only from code inside the unit: `callers=video` makes the gate verify, from
+# the relocations of the linked ELF, that nothing outside the unit's sections
+# refers to the symbol, so none of them can run while the unit is not loaded.
+.text:rdpq_set_mode_yuv -> video:YUV_BT601_TV  callers=video  # sole caller: yuv_tex_blit_run in the unit
+.data:h264_codec -> video:<section>  callers=video
+.data:rsp_yuv -> video:<section>  callers=video
+.data:rsph264_inter -> video:<section>  callers=video
+.data:rsph264_intra -> video:<section>  callers=video

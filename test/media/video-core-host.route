@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+# Whole CORE video on the host (FFmpeg decode of the stream the engine read).
+scene video-core-host
+start boot
+load level core
+probe video
+ticks 1
+seed 0
+observe log "^video-probe: name=core result=1 pictures=165 returned=1$"

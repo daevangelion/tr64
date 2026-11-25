@@ -1,0 +1,16 @@
+--- a/src/fixed/item.h
++++ b/src/fixed/item.h
+@@ -1848,12 +1848,12 @@
+         INIT_ITEM( TRAP_DART_EMITTER     , TrapDartEmitter );
+         INIT_ITEM( DRAWBRIDGE            , DrawBridge );
+         // Hazard controllers are constructed by hazardInitItem().
+-        INIT_ITEM( MOVING_OBJECT         , MovingBar );
++        // INIT_ITEM( MOVING_OBJECT         , ??? );
+         INIT_ITEM( BLOCK_1               , Block );
+         INIT_ITEM( BLOCK_2               , Block );
+         INIT_ITEM( BLOCK_3               , Block );
+         INIT_ITEM( BLOCK_4               , Block );
+         INIT_ITEM( MOVING_BLOCK          , MovingBlock );
+         // Hazard controllers are constructed by hazardInitItem().
+         INIT_ITEM( SWITCH                , Switch );
+         INIT_ITEM( SWITCH_WATER          , SwitchWater );

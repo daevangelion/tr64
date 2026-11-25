@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# CORE video stopped after 3 ticks: the picture on screen is the evidence.
+scene video-core-first
+start boot
+load level core
+probe video
+ticks 1
+seed 3
+observe log "^video-probe: name=core result=2 "
+observe pools
+observe placement

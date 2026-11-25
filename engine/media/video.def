@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: MIT
+# The video unit: the unit entry and glue, the platform decoder, and the SDK's
+# H.264 decoder, YUV conversion and video front end (text and rodata only).
+video *engine/media/film.o *plat/n64/film.o *h264_decoder.o *h264.o *yuv.o *video.o *video_memory.o

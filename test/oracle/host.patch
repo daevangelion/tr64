@@ -1,0 +1,944 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA.
+# Files src/fixed/{camera.h,common.h,game.h,item.h,lara.h,level.h,object.h}, commit 2333adef30ae2a5f3b32c5355e6e343d6aa0531a.
+# Full notice reproduced in test/oracle/LICENSE-OPENLARA.
+--- a/src/fixed/common.h
++++ b/src/fixed/common.h
+@@ -31,7 +31,15 @@
+ 
+ #define FIXED_SHIFT     14
+ 
+-#if defined(__WIN32__)
++#if defined(__TR64_ORACLE__)
++    #define USE_DIV_TABLE
++    #define MODEHW
++    #define FRAME_WIDTH 320
++    #define FRAME_HEIGHT 240
++    #define USE_FMT (LVL_FMT_PHD)
++    #include <stdint.h>
++    #include <stdlib.h>
++#elif defined(__WIN32__)
+     #define USE_DIV_TABLE
+     #define MODEHW
+     #define GAPI_GL1
+@@ -334,13 +342,13 @@
+     typedef uint8 ColorIndex;
+ #endif
+ 
+-#if defined(__N64_MG__)
++#if defined(__N64_MG__) || defined(__TR64_ORACLE__)
+     #define ADDR_ALIGN4(x) ((x) = (uint8*)(((uintptr_t)(x) + 3) & ~(uintptr_t)3))
+ #else
+     #define ADDR_ALIGN4(x) ((uint8*)x += ((intptr_t(x) + 3) & ~3) - intptr_t(x))
+ #endif
+ 
+-#if defined(__N64_MG__)
++#if defined(__N64_MG__) || defined(__TR64_ORACLE__)
+     #include <new>
+ #else
+     inline void* operator new(size_t, void *ptr)
+@@ -357,7 +365,7 @@
+ 
+ #if defined(__GBA__) || defined(__NDS__) || defined(__32X__)
+     #define int2str(x,str) itoa(x, str, 10)
+-#elif defined(__3DO__) || defined(__N64_MG__)
++#elif defined(__3DO__) || defined(__N64_MG__) || defined(__TR64_ORACLE__)
+     #define int2str(x,str) sprintf(str, "%d", x)
+ #elif defined(__TNS__)
+     #define int2str(x,str) __itoa(x, str, 10)
+@@ -381,7 +389,7 @@
+     #define ASSERT(x) { if (!(x)) { DebugBreak(); } }
+     #define STATIC_ASSERT(x) typedef char static_assert_##__COUNTER__[(x) ? 1 : -1]
+ #else
+-    #define ASSERT(x)
++    #define ASSERT(x) do { if (!(x)) { fprintf(stderr, "oracle assertion: %s:%d: %s\n", __FILE__, __LINE__, #x); abort(); } } while (0);
+     #define STATIC_ASSERT(x)
+ #endif
+ 
+--- a/src/fixed/game.h
++++ b/src/fixed/game.h
+@@ -294,6 +294,8 @@
+ static bool gameValidatePrecreatedChildrenPayloadV3(const uint8 *data,
+-    const CampaignSaveLayoutV3 &layout, const SavePayloadIndexV3 &index)
++    const CampaignSaveLayoutV3 &layout, const SavePayloadIndexV3 &index, LevelID id)
+ {
++    extern bool oracleAuthoredItemFlags(LevelID id, uint16 itemIndex,
++        uint16 &flags);
+     SaveReader reader(data + index.childPayloadOffset,
+         index.childPayloadSize);
+     uint16 ordinal = 0;
+@@ -309,8 +311,8 @@
+-        ItemSave source;
+-        memcpy(&source, data + index.itemPayloadOffsets[sourceIndex],
+-            sizeof(source));
++        uint16 sourceFlags;
++        if (!oracleAuthoredItemFlags(id, sourceIndex, sourceFlags))
++            return false;
+         const ItemType childType =
+-            encounterSelectChild(sourceType, source.flags);
++            encounterSelectChild(sourceType, sourceFlags);
+         const uint32 childSize = getItemSaveSize(childType);
+         PrecreatedChildRecordHeaderV3 header;
+         if (childSize == 0 || childSize > 0xFFFF ||
+@@ -352,7 +354,8 @@
+                data, uint8(save.flipped), layout, index) &&
+            worldValidateFlipMapsV3(flipPayload) &&
+            flipPayload.remaining() == 0 &&
+-           gameValidatePrecreatedChildrenPayloadV3(data, layout, index);
++           gameValidatePrecreatedChildrenPayloadV3(data, layout, index,
++               LevelID(save.level));
+ }
+ 
+ static bool gameValidateSaveCandidateV3(const SaveGame &save,
+@@ -2334,6 +2337,7 @@
+         }
+         osPlayLevelVideo(gLevelID, gNextLevel);
+ #endif
++        inventory.applyLevelTransition(previousLevel, gNextLevel);
+         gameApplySelectedNewGameLoadout(previousLevel, gNextLevel);
+ #ifdef OPENLARA_HOST_WORLD_SAVE_TEST
+         worldSaveTestObserveSelectedNewGameLoadout(
+--- a/src/fixed/lara.h
++++ b/src/fixed/lara.h
+@@ -361,16 +361,18 @@
+             while (item)
+             {
++                // Collision callbacks can remove item and repurpose its free-list link.
++                ItemObj* nextItem = item->nextItem;
+                 if ((item->flags & ITEM_FLAG_STATUS) != ITEM_FLAG_STATUS_INVISIBLE)
+                 {
+                     if (item->flags & ITEM_FLAG_COLLISION)
+                     {
+                         vec3i d = pos - item->pos;
+ 
+                         if (abs(d.x) < 4096 && abs(d.y) < 4096 && abs(d.z) < 4096)
+                         {
+                             item->collide(this, &cinfo);
+                         }
+                     }
+                 }
+-                item = item->nextItem;
++                item = nextItem;
+             }
+@@ -2836,6 +2838,9 @@
+ 
+         input = 0;
+ 
++    #if defined(__TR64_ORACLE__)
++        input = uint16(keys);
++    #else
+     #if defined(__3DO__)
+         if (keys & IK_A) input |= IN_JUMP;
+         if (keys & IK_B) input |= IN_ACTION;
+@@ -2930,12 +2935,15 @@
+         if (keys & IK_DOWN)    input |= IN_DOWN;
+         if (keys & IK_SELECT)  input |= IN_SELECT;
+ 
++    #endif
+         if (extraL->camera.mode == CAMERA_MODE_FREE) {
+             input = 0;
+         }
+ 
++    #if !defined(__TR64_ORACLE__)
+         if (keys & IK_START)   input |= IN_START;
++    #endif
+ 
+         if (isKeyHit(IN_START) && (inventory.state == INV_STATE_NONE))
+         {
+             if (extraL->camera.mode != CAMERA_MODE_FREE) {
+@@ -3101,22 +3109,11 @@
+ 
+             case WATER_STATE_UNDER:
+             {
+-                bool inWater = room && ROOM_FLAG_WATER(room->info->flags);
+-
+-                if (extraL->dozy)
+-                    break;
+-
+-                if (inWater) {
+-                    if (waterLevel != WALL && waterDist < 256) {
+-                        waterState = WATER_STATE_SURFACE;
+-                        pos.y -= (waterDist - 1);
+-                        animSet(ANIM_SURF, true);
+-                        vSpeed = 0;
+-                        extraL->swimTimer = LARA_SWIM_TIMER + 1;
+-                        updateRoom(-LARA_HEIGHT / 2);
+-                    }
++                // Restored: the fork surfaced her here while her room was still a water room, up to 256 units early
++                // and under a solid water-room ceiling, without the pitch and roll reset. The original leaves UNDER
++                // only once her room is no longer a water room; the branches below zero pitch and roll.
++                if (ROOM_FLAG_WATER(room->info->flags) || extraL->dozy)
+                     break;
+-                }
+ 
+                 if ((getWaterDepth() != WALL) && abs(waterDist) < 256) {
+                     waterState = WATER_STATE_SURFACE;
+@@ -3887,7 +3884,9 @@
+         weaponGetAimPoint(arm.target, to);
+ 
+         vec3i dir = to.pos - from.pos;
+-        vec3s angleAim;
++        // anglesFromVector writes only x/y; unused z was indeterminate stack data.
++        // Initialise it so the trace never exports an uninitialised value.
++        vec3s angleAim = _vec3s(0, 0, 0);
+ 
+         anglesFromVector(dir.x, dir.y, dir.z, angleAim.x, angleAim.y);
+ 
+--- a/src/fixed/level.h
++++ b/src/fixed/level.h
+@@ -291,8 +291,12 @@
+ void readLevel(const uint8* data)
+ {
+     memset(&level, 0, sizeof(level));
+-    DataStream f(data, 0x7FFFFFFF);
+-    readLevelStream(f);
++    extern uint32 oracleLevelSize;
++    DataStream f(data, oracleLevelSize);
++    if (!readLevelStream(f)) {
++        fprintf(stderr, "unsupported or invalid PC PHD level\n");
++        exit(2);
++    }
+ 
+     Level parsed = level;
+     installParsedLevel(parsed);
+--- a/src/fixed/object.h
++++ b/src/fixed/object.h
+@@ -984,8 +984,14 @@
+     Pickup(Room* room) : Object(room)
+     {
+         frameIndex = 0;
+     }
+ 
++    virtual void update()
++    {
++        if (level.models[type].count > 0)
++            animProcess();
++    }
++
+     bool use()
+     {
+         if ((flags & ITEM_FLAG_STATUS) == ITEM_FLAG_STATUS_INVISIBLE)
+--- a/src/fixed/item.h
++++ b/src/fixed/item.h
+@@ -408,6 +408,15 @@
+                             extraL->weaponState = WEAPON_STATE_FREE;
+                             break;
+                         }
++
++                        case FX_FINISH_LEVEL :
++                        {
++                            // tr64 oracle: repaired fork defect, non-fixed controller.h:1173
++                            // (the Lara special animations of LEVEL3B, LEVEL8C, LEVEL10B end the
++                            // level; the fixed game ignored the command and could never leave them).
++                            completeLevel(type == ITEM_LARA ? this : NULL);
++                            break;
++                        }
+                     /*
+                         case FX_DRAW_RIGHTGUN  : drawGun(true); break;
+                         case FX_DRAW_LEFTGUN   : drawGun(false); break;
+--- a/src/fixed/object.h
++++ b/src/fixed/object.h
+@@ -1684,10 +1684,26 @@
+         }
+     }
+     for (int32 itemIndex = 0; itemIndex < MAX_ITEMS; itemIndex++)
+-        if (items[itemIndex].room && !listed[itemIndex] &&
+-            (items[itemIndex].flags & ITEM_FLAG_STATUS) !=
+-                ITEM_FLAG_STATUS_INVISIBLE)
++    {
++        // tr64 oracle: a collected pickup is legitimately in no room's item list.
++        // Pickup::collide and ScionQualopecPickup::collide unlink the item (Room::remove
++        // keeps item->room) and set INVISIBLE; a pickup trigger under it (usePickup ->
++        // Pickup::use) then makes it INACTIVE while it stays unlinked. Only such an item is
++        // exempt here; any other item with a room that is in no list still refuses.
++        const ItemObj &candidate = items[itemIndex];
++        const int32 type = candidate.type;
++        const uint16 status = candidate.flags & ITEM_FLAG_STATUS;
++        const bool collected = status == ITEM_FLAG_STATUS_INACTIVE &&
++            ((type >= ITEM_PISTOLS && type <= ITEM_MEDIKIT_BIG) ||
++             (type >= ITEM_PUZZLE_1 && type <= ITEM_PUZZLE_4) ||
++             type == ITEM_LEADBAR ||
++             (type >= ITEM_KEY_ITEM_1 && type <= ITEM_KEY_ITEM_4) ||
++             type == ITEM_SCION_PICKUP_QUALOPEC ||
++             type == ITEM_SCION_PICKUP_DROP);
++        if (candidate.room && !listed[itemIndex] &&
++            status != ITEM_FLAG_STATUS_INVISIBLE && !collected)
+             return false;
++    }
+ 
+     if (level.boxesCount)
+     {
+--- a/src/fixed/camera.h
++++ b/src/fixed/camera.h
+@@ -15,6 +15,9 @@
+ 
+ void Camera::initCinematic()
+ {
++    // tr64 oracle: a cutscene starts with the previous level's camera timer (-1 after a fixed
++    // camera expired, e.g. LEVEL3B), so updateCinematic read cameraFrames[-1], the palette tail.
++    timer = 0;
+     switch (gLevelID)
+     {
+         case LVL_TR1_CUT_1:
+--- a/src/fixed/object.h
++++ b/src/fixed/object.h
+@@ -791,6 +791,103 @@
+ };
+ 
+ 
++// Repaired omission (tr64 hunk 16): item.h never constructed a controller for ITEM_DRAWBRIDGE,
++// so the bridge stayed in state 0 (frame 0) however it was triggered. Behaviour from the
++// floating-point game's Drawbridge (OpenLara src/objects.h:842-858, 2333adef) and
++// docs/specs/wall/drawbridge.md: the trigger drives its animation (goal down while active, up
++// otherwise, every frame); getItemFloorCeiling already gives the floor/ceiling while its current
++// state is down; while the current state is up it is a solid object.
++struct DrawBridge : Object
++{
++    enum {
++        STATE_UP,
++        STATE_DOWN
++    };
++
++    DrawBridge(Room* room) : Object(room) {}
++
++    virtual void update()
++    {
++        if (isActive()) {
++            if (state == STATE_UP) {
++                goalState = STATE_DOWN;
++            }
++        } else {
++            if (state == STATE_DOWN) {
++                goalState = STATE_UP;
++            }
++        }
++
++        animProcess();
++    }
++
++    virtual void collide(Lara* lara, CollisionInfo* cinfo)
++    {
++        // Raised: a solid like a closed door; the push-out also hits Lara while it is moving
++        // (state != goalState). Lowered: nothing, the bridge is a floor.
++        if (state != STATE_UP)
++            return;
++
++        if (!updateHitMask(lara, cinfo))
++            return;
++
++        if (!cinfo->enemyPush)
++            return;
++
++        collidePush(lara, cinfo, state != goalState);
++    }
++};
++
++
++// Repaired omission (tr64 hunk 19): item.h never constructed a controller for ITEM_CABIN (LEVEL10A
++// item 84, Natla's Mines), so the three fuses did nothing. OpenLara src/objects.h:1463-1490
++// (2333adef) and docs/specs/wall/objects-missing.md section 18: each completed trigger mask
++// advances it one stage (states 0, 1, 2 -> goal state + 1) and clears the code bits; in state 4
++// map flip slot 3 is set to all code bits, the map is flipped and the item is removed.
++// It is a solid object.
++struct Cabin : Object
++{
++    enum {
++        STATE_UP,
++        STATE_DOWN_1,
++        STATE_DOWN_2,
++        STATE_DOWN_3,
++        STATE_GROUND
++    };
++
++    Cabin(Room* room) : Object(room) {}
++
++    virtual void update()
++    {
++        if ((flags & ITEM_FLAG_MASK) == ITEM_FLAG_MASK)
++        {
++            if (state >= STATE_UP && state <= STATE_DOWN_2)
++                goalState = state + 1;
++            flags &= ~ITEM_FLAG_MASK;
++        }
++
++        if (state == STATE_GROUND)
++        {
++            gFlipMapState[3].mask = ITEM_FLAGS_MASK_ALL;
++            gFlipMapState[3].flags |= FLIPMAP_ACTIVE;
++            worldRequestFlipToggle();
++            worldApplyPendingFlip();
++            flags &= ~(ITEM_FLAG_STATUS | ITEM_FLAG_COLLISION);
++            flags |= ITEM_FLAG_STATUS_INVISIBLE;
++            deactivate();
++            return;
++        }
++
++        animProcess();
++    }
++
++    virtual void collide(Lara* lara, CollisionInfo* cinfo)
++    {
++        collideDefault(lara, cinfo);
++    }
++};
++
++
+ struct Gears : Object
+ {
+     enum {
+--- a/src/fixed/item.h
++++ b/src/fixed/item.h
+@@ -833,13 +833,16 @@
+ 
+ int32 ItemObj::getDrawBridgeFloor(int32 x, int32 z) const
+ {
+-    int32 dx = (pos.x >> 10) - (x >> 10);
+-    int32 dz = (pos.z >> 10) - (z >> 10);
++    // Repaired defects (tr64 hunk 18): the offsets were taken item minus query, which put the
++    // two covered sectors behind the item instead of in front of it (the level's trigger
++    // entries sit in front), and the 90/270 degree rows tested dz where dx was meant.
++    int32 dx = (x >> 10) - (pos.x >> 10);
++    int32 dz = (z >> 10) - (pos.z >> 10);
+ 
+     if (((dx == 0) && ((dz == -1) || (dz == -2)) && (angle.y ==  ANGLE_0))   ||
+         ((dx == 0) && ((dz ==  1) || (dz ==  2)) && (angle.y ==  ANGLE_180)) ||
+-        ((dz == 0) && ((dx == -1) || (dz == -2)) && (angle.y ==  ANGLE_90))  ||
+-        ((dz == 0) && ((dx ==  1) || (dz ==  2)) && (angle.y == -ANGLE_90)))
++        ((dz == 0) && ((dx == -1) || (dx == -2)) && (angle.y ==  ANGLE_90))  ||
++        ((dz == 0) && ((dx ==  1) || (dx ==  2)) && (angle.y == -ANGLE_90)))
+     {
+         return pos.y;
+     }
+@@ -1826,7 +1829,7 @@
+         // Hazard controllers are constructed by hazardInitItem().
+         INIT_ITEM( DART                  , Dart );
+         INIT_ITEM( TRAP_DART_EMITTER     , TrapDartEmitter );
+-        // INIT_ITEM( DRAWBRIDGE            , ??? );
++        INIT_ITEM( DRAWBRIDGE            , DrawBridge );
+         // Hazard controllers are constructed by hazardInitItem().
+         // INIT_ITEM( MOVING_OBJECT         , ??? );
+         INIT_ITEM( BLOCK_1               , Block );
+@@ -1942,7 +1945,7 @@
+         // INIT_ITEM( UNUSED_12             , ??? );
+         INIT_ITEM( SMOKE                 , SpriteEffect );
+         INIT_ITEM( CENTAUR_STATUE        , CentaurStatue );
+-        // INIT_ITEM( CABIN                 , ??? );
++        INIT_ITEM( CABIN                 , Cabin );
+         INIT_ITEM( MUTANT_EGG_SMALL      , MutantEggSmall );
+         INIT_ITEM( RICOCHET              , SpriteEffect );
+         INIT_ITEM( SPARKLES              , SpriteEffect );
+--- a/src/fixed/enemy.h
++++ b/src/fixed/enemy.h
+@@ -98,8 +98,28 @@
+         initExtra();
+ 
+         const Sector* sector = room->getSector(pos.x, pos.z);
+-        ASSERT(sector->boxIndex != NO_BOX);
+-        extraE->nav.init(sector->boxIndex);
++        if (sector->boxIndex == NO_BOX && type == ITEM_DOPPELGANGER)
++        {
++            // tr64 oracle: a loaded, active doppelganger stands at the mirror image of Lara, which
++            // can be over a wall sector with no box (LEVEL10B room 57). Nav::init(NO_BOX) read
++            // zones[NO_BOX], 128 KB past the zone table (release builds), and the assertion below
++            // stopped the oracle. The doppelganger never navigates: leave the nav state cleared.
++            Nav &nav = extraE->nav;
++            nav.zoneType = ZONE_GROUND_1;   // stepHeight is 256 (set above)
++            nav.weight = 0;
++            nav.endBox = nav.nextBox = nav.headBox = nav.tailBox = NO_BOX;
++            nav.mask = BOX_OVERLAP_BLOCKED;
++            for (int32 i = 0; i < level.boxesCount; i++)
++            {
++                nav.cells[i].end = NO_BOX;
++                nav.cells[i].next = NO_BOX;
++                nav.cells[i].weight = 0;
++            }
++            nav.cellsCount = 0;
++            return;
++        }
++        ASSERT(sector->boxIndex != NO_BOX);
++        extraE->nav.init(sector->boxIndex);
+     }
+ 
+     bool enable(bool forced)
+--- a/src/fixed/item.h
++++ b/src/fixed/item.h
+@@ -1235,9 +1235,26 @@
+         record.roomIndex >= level.roomsCount)
+         return false;
+ 
++    // tr64 oracle: a collected pickup stays out of its room's item list. Pickup::collide and
++    // ScionQualopecPickup::collide unlink it (Room::remove keeps `room`) and a pickup trigger under
++    // it then turns INVISIBLE into INACTIVE; the saved state is INACTIVE and the item is in no
++    // list. Linking every item again put that pickup back where it could be collected a second
++    // time (LEVEL3A 33, 40, 53; LEVEL3B 20; LEVEL4 71; LEVEL8C 10, 54). The condition is hunk 14's.
++    const int32 recordType = type;
++    const bool collected = (record.flags & ITEM_FLAG_STATUS) == ITEM_FLAG_STATUS_INACTIVE &&
++        ((recordType >= ITEM_PISTOLS && recordType <= ITEM_MEDIKIT_BIG) ||
++         (recordType >= ITEM_PUZZLE_1 && recordType <= ITEM_PUZZLE_4) ||
++         recordType == ITEM_LEADBAR ||
++         (recordType >= ITEM_KEY_ITEM_1 && recordType <= ITEM_KEY_ITEM_4) ||
++         recordType == ITEM_SCION_PICKUP_QUALOPEC ||
++         recordType == ITEM_SCION_PICKUP_DROP);
++
+     if (room)
+         room->remove(this);
+-    rooms[record.roomIndex].add(this);
++    if (collected)
++        room = rooms + record.roomIndex;
++    else
++        rooms[record.roomIndex].add(this);
+ 
+     pos.x       = record.x + (room->info->x << 8);
+     pos.y       = record.y + room->info->yTop;
+--- a/src/fixed/room.h
++++ b/src/fixed/room.h
+@@ -921,6 +921,8 @@
+ extern void fixedHazardObserveTrigger();
+ #endif
+ 
++void hazardLavaBurn(ItemObj* lara); // hazard_lara.h (tr64 oracle, lava floor)
++
+ void checkTrigger(const FloorData* fd, ItemObj* lara)
+ {
+ #if defined(OPENLARA_HOST_HAZARD_TEST)
+@@ -931,7 +933,9 @@
+ 
+     if (FD_FLOOR_TYPE(*fd) == FLOOR_TYPE_LAVA)
+     {
+-        // TODO lava
++        // tr64 oracle: lava floor (was a TODO). Lara is burnt when she stands on the floor.
++        if (lara)
++            hazardLavaBurn(lara);
+ 
+         if (FD_END(*fd))
+             return;
+--- a/src/fixed/hazard_lara.h
++++ b/src/fixed/hazard_lara.h
+@@ -104,8 +104,10 @@
+     LaraHazardState &state = gLaraHazardState[playerIndex];
+     if (!(state.flags & LARA_HAZARD_BURNING))
+         return;
++    // tr64 oracle: no timeout. The original burns Lara until she reaches water or dies
++    // (docs/specs/wall/objects-missing.md 15.2); the source stopped after BURN_DURATION_TICKS (90).
+     if (lara->health <= 0 || lara->waterState == WATER_STATE_SURFACE ||
+-        lara->waterState == WATER_STATE_UNDER || state.burnTicks == 0)
++        lara->waterState == WATER_STATE_UNDER)
+     {
+         hazardClearLaraBurn(lara);
+         return;
+@@ -114,15 +116,43 @@
+     if (state.damageCooldown != 0)
+     {
+         state.damageCooldown--;
+-        state.burnTicks--;
+         return;
+     }
+     state.damageCooldown = HazardOracleFlame::BURN_DAMAGE_CADENCE_TICKS - 1;
+-    state.burnTicks--;
+     hazardDamageLara(lara, HazardOracleFlame::BURN_DAMAGE, HAZARD_HIT_FLAME,
+         lara->pos);
+-    if (lara->health > 0 && state.burnTicks == 0)
+-        hazardClearLaraBurn(lara);
+ }
+ 
++// tr64 oracle: the lava floor rule (docs/specs/wall/objects-missing.md 15.3, triggers-and-effects.md 2.1).
++// Nothing happens if Lara's hit points are already below 0, if she is not on the floor (y equals her recorded
++// floor), or if the real floor of the sector (read at y = 32000: the lowest, ignoring bridges and other items)
++// is not her recorded floor. Otherwise her hit points become -1 and she burns (the flames attached to her
++// are the burning state; the death proceeds as for any hit points of 0 or below).
++void hazardLavaBurn(ItemObj *item)
++{
++    if (!item || item->type != ITEM_LARA)
++        return;
++    Lara *lara = (Lara*)item;
++    const int32 playerIndex = hazardLaraPlayerIndex(lara);
++    if (playerIndex < 0 || lara->health < 0 || lara->pos.y != lara->roomFloor)
++        return;
++
++    const FloorData *lastData = gLastFloorData;
++    const int32 lastSlant = gLastFloorSlant;
++    const int32 realFloor = lara->room->getSector(lara->pos.x, lara->pos.z)->getFloor(lara->pos.x, 32000, lara->pos.z);
++    gLastFloorData = lastData;
++    gLastFloorSlant = lastSlant;
++    if (realFloor != lara->roomFloor)
++        return;
++
++    lara->health = -1;
++    lara->extraL->hazardCause = uint8(HAZARD_HIT_LAVA);
++    LaraHazardState &state = gLaraHazardState[playerIndex];
++    state.burnTicks = HazardOracleFlame::BURN_DURATION_TICKS;
++    state.damageCooldown = 0;
++    state.flameItemIndex = -1;
++    state.flags = LARA_HAZARD_BURNING;
++    state.reserved = 0;
++}
++
+ #endif
+--- a/src/fixed/hazard_ceiling.h
++++ b/src/fixed/hazard_ceiling.h
+@@ -33,7 +33,9 @@
+             !collideBounds(lara, cinfo))
+             return;
+ 
+-        hazardKillLara(lara, HAZARD_HIT_CEILING, pos);
++        // tr64 oracle: 300 hit points per frame of contact (docs/specs/wall/objects-missing.md 12),
++        // not 1000 at the first contact.
++        hazardDamageLara(lara, 300, HAZARD_HIT_CEILING, pos);
+     }
+ 
+     virtual void update()
+--- a/src/fixed/object.h
++++ b/src/fixed/object.h
+@@ -706,10 +706,77 @@
+ };
+ 
+ 
++// tr64 oracle: lava particle (docs/specs/wall/objects-missing.md 16.2). The reference built no controller
++// for ITEM_LAVA_PARTICLE, so the emitters below produced nothing. OpenLara src/objects.h:301-390 is the
++// floating-point model; the numbers here are the specification's.
++struct LavaParticle : ItemObj
++{
++    LavaParticle(Room* room) : ItemObj(room)
++    {
++        tick = 0;
++        timer = 0;
++        hSpeed = 0;
++        vSpeed = 0;
++        frameIndex = 0;
++        activate();
++    }
++
++    virtual void update()
++    {
++        int32 s, c;
++        sincos(angle.y, s, c);
++        pos.x += s * hSpeed >> FIXED_SHIFT;
++        pos.z += c * hSpeed >> FIXED_SHIFT;
++        vSpeed += 6;
++        pos.y += vSpeed;
++
++        Room* nextRoom = room->getRoom(pos.x, pos.y, pos.z);
++        const Sector* sector = nextRoom->getSector(pos.x, pos.z);
++        if (pos.y >= sector->getFloor(pos.x, pos.y, pos.z) ||
++            pos.y <= sector->getCeiling(pos.x, pos.y, pos.z))
++        {
++            remove();
++            return;
++        }
++
++        Lara* lara = getLara(pos);
++        if (lara && lara->health > 0)
++        {
++            const int32 dx = lara->pos.x - pos.x;
++            const int32 dz = lara->pos.z - pos.z;
++            const AABBs &box = lara->getBoundingBox(true);
++            const int32 top = lara->pos.y + box.minY;
++            const int32 bottom = lara->pos.y + box.maxY + 100;
++            if (abs(dx) <= 200 && abs(dz) <= 200 && dx * dx + dz * dz <= 200 * 200 &&
++                abs(lara->pos.y - pos.y) <= 3072 && pos.y >= top && pos.y <= bottom)
++            {
++                lara->hit(10, pos, 0);
++                remove();
++                return;
++            }
++        }
++
++        updateRoom();
++    }
++};
++
+ struct LavaEmitter : Object
+ {
+     LavaEmitter(Room* room) : Object(room) {}
+ 
++    // tr64 oracle: once active it needs no trigger; each frame one particle (16.1).
++    virtual void update()
++    {
++        ItemObj* particle = ItemObj::add(ITEM_LAVA_PARTICLE, room, pos, int16(RAND_LOGIC(0x10000)));
++        if (particle)
++        {
++            particle->hSpeed = int16(RAND_LOGIC(32));
++            particle->vSpeed = int16(-RAND_LOGIC(164));
++            particle->frameIndex = int16(RAND_DRAW(5));
++        }
++        soundPlay(SND_LAVA, &pos);
++    }
++
+     virtual void draw() {}
+ };
+ 
+--- a/src/fixed/item.h
++++ b/src/fixed/item.h
+@@ -1976,7 +1976,7 @@
+         INIT_ITEM( CENTAUR_BULLET        , Bullet );
+         // INIT_ITEM( UNUSED_15             , ??? );
+         // INIT_ITEM( UNUSED_16             , ??? );
+-        // INIT_ITEM( LAVA_PARTICLE         , ??? );
++        INIT_ITEM( LAVA_PARTICLE         , LavaParticle );
+         INIT_ITEM( LAVA_EMITTER          , LavaEmitter );
+         // INIT_ITEM( FLAME                 , ??? );
+         // INIT_ITEM( FLAME_EMITTER         , ??? );
+--- a/src/fixed/object.h
++++ b/src/fixed/object.h
+@@ -955,6 +955,120 @@
+ };
+ 
+ 
++// Repaired omission (tr64 hunk 25): item.h never constructed a controller for ITEM_MOVING_BLOCK
++// (the rolling block, LEVEL3B items 49 and 50), so its sectors were never solid and it never
++// slid. docs/specs/wall/objects-missing.md sections 2.1 and 3, floating-point game
++// OpenLara src/objects.h:613-669 (2333adef). Its sector is raised by 2048 (8 clicks) from the
++// start (worldRebuildDerivedState does this for every block, as for the pushable ones); while
++// triggered in state 0 the goal is 1, while not triggered in state 1 the goal is 0, and the
++// sector is restored when the slide begins; the slide animation ends with the kill command
++// (status inactive), then the block stays in the active list, snaps to the centre of its
++// sector and raises it there. It evaluates no heavy trigger (specification, differs from the
++// floating-point game).
++#define MOVING_BLOCK_CLICKS 8
++
++static void movingBlockAdjust(Room* room, const vec3i &pos, Sector &sector, bool raise)
++{
++    // Specification 2.1: raise by D: C = ceiling value of the sector found at y - D - 1024; a wall
++    // gets C - D, else the floor value drops by D and becomes a wall on reaching C. Restore by D:
++    // C at y + D - 1024; a wall gets C + D, else the floor value rises by D.
++    const int32 D = MOVING_BLOCK_CLICKS << 8;
++    Room* other = room->getRoom(pos.x, raise ? pos.y - D - 1024 : pos.y + D - 1024, pos.z);
++    const int32 c = other->getSector(pos.x, pos.z)->ceiling;
++    const int32 step = raise ? -MOVING_BLOCK_CLICKS : MOVING_BLOCK_CLICKS;
++    if (sector.floor == NO_FLOOR) {
++        sector.floor = int8(c + step);
++    } else {
++        sector.floor = int8(sector.floor + step);
++        if (sector.floor == c)
++            sector.floor = NO_FLOOR;
++    }
++}
++
++static void movingBlockFloor(Room* room, const vec3i &pos, bool raise)
++{
++    Room* target = room->getRoom(pos.x, pos.y, pos.z);
++    if (!target->modify()) {
++        ASSERT(false);
++        return;
++    }
++    movingBlockAdjust(target, pos, *(Sector*)target->getSector(pos.x, pos.z), raise);
++}
++
++struct MovingBlock : Object
++{
++    enum {
++        STATE_START,
++        STATE_END,
++        STATE_MOVE
++    };
++
++    MovingBlock(Room* room) : Object(room) {}
++
++    virtual void update()
++    {
++        if (isActive())
++        {
++            if (state == STATE_START)
++            {
++                goalState = STATE_END;
++                movingBlockFloor(room, pos, false);
++            }
++        }
++        else if (state == STATE_END)
++        {
++            goalState = STATE_START;
++            movingBlockFloor(room, pos, false);
++        }
++
++        animProcess();
++
++        if ((flags & ITEM_FLAG_STATUS) == ITEM_FLAG_STATUS_INACTIVE)
++        {
++            flags &= ~ITEM_FLAG_STATUS;
++            flags |= ITEM_FLAG_STATUS_ACTIVE; // stays in the active list
++            pos.x = (pos.x & ~1023) + 512;
++            pos.z = (pos.z & ~1023) + 512;
++            movingBlockFloor(room, pos, true);
++        }
++    }
++};
++
++
++// Repaired omission (tr64 hunk 26): item.h never constructed a controller for ITEM_MOVING_OBJECT
++// (the moving bar: LEVEL4 items 75 to 78, LEVEL10A item 12). Specification section 6 and
++// OpenLara src/objects.h:1406-1425 (2333adef): while active the goal state is 1 while triggered
++// and 0 otherwise, the item follows its animation (its speed moves it along its facing) and its
++// room follows its position; it is a standard solid.
++struct MovingBar : Object
++{
++    enum {
++        STATE_CLOSE,
++        STATE_OPEN
++    };
++
++    MovingBar(Room* room) : Object(room) {}
++
++    virtual void update()
++    {
++        goalState = isActive() ? STATE_OPEN : STATE_CLOSE;
++        animProcess();
++
++        Room* nextRoom = room->getRoom(pos.x, pos.y, pos.z);
++        if (room != nextRoom)
++        {
++            room->remove(this);
++            nextRoom->add(this);
++        }
++    }
++
++    virtual void collide(Lara* lara, CollisionInfo* cinfo)
++    {
++        collideDefault(lara, cinfo);
++    }
++};
++
++
+ struct Gears : Object
+ {
+     enum {
+@@ -2081,8 +2195,19 @@
+         status != ITEM_FLAG_STATUS_ACTIVE;
+ }
+ 
++// Tr64 hunk 25: the rolling block (ITEM_MOVING_BLOCK) keeps its sector raised like a pushable block,
++// except while it slides (state 2, specification section 3: "not in the moving state"); its status
++// stays active for the whole time it can be triggered, so it is not read.
++X_INLINE bool worldIsFloorBlockItem(const ItemObj &item)
++{
++    return worldIsBlockType(item.type) || item.type == ITEM_MOVING_BLOCK;
++}
++
+ static bool worldBlockAffectsFloor(const ItemObj &item)
+ {
++    if (item.type == ITEM_MOVING_BLOCK)
++        return (item.flags & ITEM_FLAG_STATUS) != ITEM_FLAG_STATUS_INVISIBLE &&
++            item.state != MovingBlock::STATE_MOVE;
+     return worldBlockFlagsAffectFloor(item.flags);
+ }
+ 
+@@ -2121,7 +2246,7 @@
+                 }
+             }
+         }
+-        else if (worldIsBlockType(item.type) &&
++        else if (worldIsFloorBlockItem(item) &&
+                  worldBlockAffectsFloor(item))
+         {
+             if (!item.room || item.room < rooms ||
+@@ -2157,9 +2282,12 @@
+     return true;
+ }
+ 
+-static void worldApplyBlockFloor(Sector &sector)
++static void worldApplyBlockFloor(const ItemObj &item, Room* room, Sector &sector)
+ {
+-    sector.floor -= 4;
++    if (item.type == ITEM_MOVING_BLOCK)
++        movingBlockAdjust(room, item.pos, sector, true);
++    else
++        sector.floor -= 4;
+ }
+ 
+ bool worldRebuildDerivedStateForFlip(uint8 flipped)
+@@ -2207,7 +2335,7 @@
+     for (uint16 itemIndex = 0; itemIndex < level.itemsCount; itemIndex++)
+     {
+         ItemObj &item = items[itemIndex];
+-        if (!worldIsBlockType(item.type) ||
++        if (!worldIsFloorBlockItem(item) ||
+             !worldBlockAffectsFloor(item))
+             continue;
+         uint8 logicalRoom = uint8(item.room - rooms);
+@@ -2216,7 +2344,7 @@
+             item.pos.x, item.pos.z, sectorIndex);
+         ASSERT(indexed);
+         (void)indexed;
+-        worldApplyBlockFloor(
++        worldApplyBlockFloor(item, rooms + logicalRoom,
+             ((Sector*)rooms[logicalRoom].sectors)[sectorIndex]);
+     }
+ 
+--- a/src/fixed/item.h
++++ b/src/fixed/item.h
+@@ -1848,12 +1848,12 @@
+         INIT_ITEM( TRAP_DART_EMITTER     , TrapDartEmitter );
+         INIT_ITEM( DRAWBRIDGE            , DrawBridge );
+         // Hazard controllers are constructed by hazardInitItem().
+-        // INIT_ITEM( MOVING_OBJECT         , ??? );
++        INIT_ITEM( MOVING_OBJECT         , MovingBar );
+         INIT_ITEM( BLOCK_1               , Block );
+         INIT_ITEM( BLOCK_2               , Block );
+         INIT_ITEM( BLOCK_3               , Block );
+         INIT_ITEM( BLOCK_4               , Block );
+-        // INIT_ITEM( MOVING_BLOCK          , ??? );
++        INIT_ITEM( MOVING_BLOCK          , MovingBlock );
+         // Hazard controllers are constructed by hazardInitItem().
+         INIT_ITEM( SWITCH                , Switch );
+         INIT_ITEM( SWITCH_WATER          , SwitchWater );
+--- a/src/fixed/hazard_thor_lightning.h
++++ b/src/fixed/hazard_thor_lightning.h
+@@ -44,10 +44,18 @@
+ 
+     void impact(Lara *lara)
+     {
+-        if (!lara || lara->health <= 0 || frameIndex <= 30)
++        // tr64 oracle (hunk 27): more than 30 frames INTO the animation (specification 12); frameIndex is the
++        // level-wide frame number, so the source's test `frameIndex <= 30` was never true and the strike came on
++        // the first tick of the swing.
++        if (!lara || lara->health <= 0 || frameIndex - level.anims[animIndex].frameBegin <= 30)
+             return;
++        // tr64 oracle (hunk 27): the impact point is 3072 ahead in the hammer's facing (0: +z, 90: +x,
++        // 180: -z, 270: -x; docs/specs/wall/objects-missing.md section 12). getBlockOffset's axes are
++        // the other way round (angle 0 gives -z), so the distance is negative: with the source's sign the
++        // point lay behind the hammer, in the rock wall for the one hammer (LEVEL4 item 63), and the
++        // hammer could never touch Lara.
+         const vec3i d = pos + getBlockOffset(angle.y,
+-            HazardOracleThor::IMPACT_OFFSET) - lara->pos;
++            -HazardOracleThor::IMPACT_OFFSET) - lara->pos;
+         if (abs(d.x) < HazardOracleThor::IMPACT_RANGE &&
+             abs(d.z) < HazardOracleThor::IMPACT_RANGE)
+             hazardDamageLara(lara, HazardOracleThor::DAMAGE,
+--- a/src/fixed/room.h
++++ b/src/fixed/room.h
+@@ -923,6 +923,23 @@
+ 
+ void hazardLavaBurn(ItemObj* lara); // hazard_lara.h (tr64 oracle, lava floor)
+ 
++// tr64 oracle (hunk 28): what an ACTIVATE_OBJECT trigger action does once the mask is complete and the item is not yet
++// active (also the test-only `activate` directive). A non-enemy item becomes status active (docs/specs/wall/
++// triggers-and-effects.md section 4, object action, "everything else"); the source did it only for a status of 0, so an
++// item that starts invisible (level flag bit 8: the falling ceilings, blocks, pickups, ...) stayed invisible: not drawn,
++// never collided with. Enemies keep their own rule (Enemy::update takes a creature slot, then becomes active).
++static void worldTriggerActivate(ItemObj* item)
++{
++    item->activate();
++
++    if (!(item->flags & ITEM_FLAG_STATUS) && (item->flags & ITEM_FLAG_ACTIVE)) {
++        item->flags |= ITEM_FLAG_STATUS_ACTIVE;
++    } else if ((item->flags & ITEM_FLAG_STATUS) == ITEM_FLAG_STATUS_INVISIBLE &&
++               (item->flags & ITEM_FLAG_ACTIVE) && item->health == NOT_ENEMY) {
++        item->flags = (item->flags & ~ITEM_FLAG_STATUS) | ITEM_FLAG_STATUS_ACTIVE;
++    }
++}
++
+ void checkTrigger(const FloorData* fd, ItemObj* lara)
+ {
+ #if defined(OPENLARA_HOST_HAZARD_TEST)
+@@ -1053,11 +1070,7 @@
+                 if (item->flags & ITEM_FLAG_ACTIVE)
+                     break;
+ 
+-                item->activate();
+-
+-                if (!(item->flags & ITEM_FLAG_STATUS) && (item->flags & ITEM_FLAG_ACTIVE)) {
+-                    item->flags |= ITEM_FLAG_STATUS_ACTIVE;
+-                }
++                worldTriggerActivate(item);
+ 
+                 break;
+             }

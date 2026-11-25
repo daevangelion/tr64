@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Exercise production updateWaterState deriving an underwater initial state.
+start 14 40448 4608 60928 0
+hold JUMP 30
+hold BACK+JUMP 45
+hold JUMP 20
+hold NONE 60

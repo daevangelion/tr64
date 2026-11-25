@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: MIT
+# ares d9117003192cd43806ddc24d20c764ddb9afc965
+# Existing local harness preimage git blob: 10449ea6c4ddaa54fac83cbe24b440f8f32fa4ad
+--- a/ares/n64/cartridge/testharness.cpp
++++ b/ares/n64/cartridge/testharness.cpp
+@@ -16,6 +16,10 @@
+ // image when the guest exits through this device (the exit does not run the emulator's
+ // own save, which only autosaves every 30 s and at unload).
+ //
++// SRAM fixtures are opt-in only: ARES_SRAM_IN imports canonical guest-order
++// bytes before boot; ARES_SRAM_OUT exports them at this test-only exit.
++// Without either variable, normal SRAM loading/saving behavior is unchanged.
++//
+ // Register map (32-bit CPU accesses):
+ //   +0x00  CMD   (w): 1 = screenshot, 2 = exit
+ //   +0x04  ARG0  (w): screenshot: RDRAM byte address of framebuffer
+@@ -25,10 +29,28 @@
+ //   +0x10  MAGIC (r): 0x54455354 "TEST" — presence probe for the guest
+ 
+ #include <n64/agent.hpp>
++#include <signal.h>
+ 
+ // Final VI dump lives in cpu/debugger.cpp (HostShot); linked via unity TU order.
+ auto agentDumpFinalShot() -> void;
+ 
++// A shipping cart never calls the guest exit, so ARES_SRAM_OUT is also written
++// when the harness terminates the emulator (TERM/INT), then the process leaves
++// without the emulator's own unload.
++static void exportSramOnSignal(int signalNumber) {
++  const char* path = getenv("ARES_SRAM_OUT");
++  FILE* fp = path && cartridge.ram.size ? fopen(path, "wb") : nullptr;
++  bool ok = fp != nullptr;
++  for(u32 address = 0; ok && address < cartridge.ram.size; ++address) {
++    if(fputc(cartridge.ram.read<Byte>(address), fp) == EOF) ok = false;
++  }
++  if(fp && fclose(fp)) ok = false;
++  printf("TESTHARNESS SRAM %s %s (%u bytes) on signal %d\n", ok ? "out" : "out FAILED",
++    path ? path : "(unset)", (u32)cartridge.ram.size, signalNumber);
++  fflush(stdout);
++  ::_Exit(ok ? 128 + signalNumber : 2);
++}
++
+ // Called from Cartridge::allocate() on cart boots, and lazily from the PI decode
+ // so 64DD disk-only boots get the harness too -- those never connect a
+ // cartridge, so allocate() never runs and the guest would have no way to report.
+@@ -67,6 +89,41 @@
+       fflush(stdout);
+     }
+   }
++
++  if(active) {
++    const char* input = getenv("ARES_SRAM_IN");
++    const char* output = getenv("ARES_SRAM_OUT");
++    if((input || output) && !cartridge.ram.size) {
++      printf("TESTHARNESS SRAM fixture: ROM has no SRAM\n");
++      fflush(stdout);
++      ::_Exit(2);
++    }
++    if(input) {
++      FILE* fp = fopen(input, "rb");
++      bool ok = fp != nullptr;
++      for(u32 address = 0; ok && address < cartridge.ram.size; ++address) {
++        int value = fgetc(fp);
++        if(value == EOF) ok = false;
++        else cartridge.ram.write<Byte>(address, (u8)value);
++      }
++      if(fp) {
++        if(fgetc(fp) != EOF || ferror(fp)) ok = false;
++        if(fclose(fp)) ok = false;
++      }
++      if(!ok) {
++        printf("TESTHARNESS SRAM in: %s is not a readable %u-byte image\n",
++          input, (u32)cartridge.ram.size);
++        fflush(stdout);
++        ::_Exit(2);
++      }
++      printf("TESTHARNESS SRAM in %s (%u bytes)\n", input, (u32)cartridge.ram.size);
++      fflush(stdout);
++    }
++    if(output) {
++      ::signal(SIGTERM, exportSramOnSignal);
++      ::signal(SIGINT, exportSramOnSignal);
++    }
++  }
+ }
+ 
+ auto Cartridge::TestHarness::readWord(u32 address) -> u32 {
+@@ -139,6 +196,22 @@
+ }
+ 
+ auto Cartridge::TestHarness::exitEmulator() -> void {
++  if(active) if(auto path = getenv("ARES_SRAM_OUT")) {
++    FILE* fp = cartridge.ram.size ? fopen(path, "wb") : nullptr;
++    bool ok = fp != nullptr;
++    for(u32 address = 0; ok && address < cartridge.ram.size; ++address) {
++      if(fputc(cartridge.ram.read<Byte>(address), fp) == EOF) ok = false;
++    }
++    if(fp && fclose(fp)) ok = false;
++    if(!ok) {
++      printf("TESTHARNESS SRAM out: cannot write %s (%u bytes)\n",
++        path, (u32)cartridge.ram.size);
++      fflush(stdout);
++      ::_Exit(2);
++    }
++    printf("TESTHARNESS SRAM out %s (%u bytes)\n", path, (u32)cartridge.ram.size);
++    fflush(stdout);
++  }
+   // arg0 = status; arg1/arg2 optional context from guest crash handlers
+   // (e.g. EPC and exception code). Print them when non-zero so headless
+   // runs can diagnose faults without ISViewer.

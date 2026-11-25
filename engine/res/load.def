@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: MIT
+# Writable data remains resident; typed gameplay views/facades are not selected.
+load *engine/res/pack.o *engine/res/level.o *engine/res/validate.o *engine/res/tex.o *engine/res/sound.o *engine/res/image.o *engine/res/load-unit.o

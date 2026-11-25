@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Source ledge in room 8; +X faces the lower 5120-unit floor.
+start 8 56320 2560 54784 16384
+hold FORWARD+JUMP 45
+hold NONE 75

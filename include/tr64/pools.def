@@ -1,0 +1,21 @@
+/* SPDX-License-Identifier: MIT */
+/* The memory budget of docs/architecture.md section 4.1, one row per line.
+ * TR64_POOL(id, KiB, kind)
+ *   kind IMAGE : the linked resident image (text, rodata, data, bss);
+ *                checked against the cart ELF, not carved.
+ *   kind FIXED : placed by the platform (stack, framebuffers, Z); sized
+ *                here, checked at boot.
+ *   kind CARVE : carved by mem_boot_carve in this order.
+ * The rows sum to 3354 KiB; the remaining 742 KiB of the 4096 are reserve.
+ * Tools parse this file: keep one TR64_POOL per line, decimal KiB. */
+TR64_POOL(image,     608, IMAGE)
+TR64_POOL(stack,      64, FIXED)
+TR64_POOL(fb,        300, FIXED)
+TR64_POOL(zbuf,      150, FIXED)
+TR64_POOL(code,       96, CARVE)
+TR64_POOL(gpu,       232, CARVE)
+TR64_POOL(audio,     128, CARVE)
+TR64_POOL(libheap,    64, CARVE)
+TR64_POOL(level,    1472, CARVE)
+TR64_POOL(state,     192, CARVE)
+TR64_POOL(io,         48, CARVE)

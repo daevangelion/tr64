@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+scene pickup-presentation
+start boot
+load level level3a
+probe reload
+ticks 2
+seed 1
+observe log "^presentation proof PASS ticks=600 events=[1-9][0-9]* bones=[1-9][0-9]* ammo_ticks=[1-9][0-9]*$"
+observe pools
+observe placement

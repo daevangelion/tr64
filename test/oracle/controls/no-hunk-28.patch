@@ -1,0 +1,12 @@
+--- a/src/fixed/room.h
++++ b/src/fixed/room.h
+@@ -934,9 +934,6 @@
+ 
+     if (!(item->flags & ITEM_FLAG_STATUS) && (item->flags & ITEM_FLAG_ACTIVE)) {
+         item->flags |= ITEM_FLAG_STATUS_ACTIVE;
+-    } else if ((item->flags & ITEM_FLAG_STATUS) == ITEM_FLAG_STATUS_INVISIBLE &&
+-               (item->flags & ITEM_FLAG_ACTIVE) && item->health == NOT_ENEMY) {
+-        item->flags = (item->flags & ~ITEM_FLAG_STATUS) | ITEM_FLAG_STATUS_ACTIVE;
+     }
+ }
+ 

@@ -1,0 +1,93 @@
+diff --git a/ares/n64/controller/gamepad/gamepad.cpp b/ares/n64/controller/gamepad/gamepad.cpp
+--- a/ares/n64/controller/gamepad/gamepad.cpp
++++ b/ares/n64/controller/gamepad/gamepad.cpp
+@@ -433,30 +433,2 @@ auto Gamepad::read() -> n32 {
+   }
+-
+-  //test harness: merge injected state from the file named by ARES_TEST_INPUT.
+-  //file holds one line: "<buttons-hex> <stick_x> <stick_y>", where buttons use
+-  //this word's bit layout (bit31=A, 30=B, 29=Z, 28=Start, 27-24=dU/dD/dL/dR,
+-  //21=L, 20=R, 19-16=cU/cD/cL/cR) and the stick is in raw -85..85 units.
+-  static const char* injectPath = getenv("ARES_TEST_INPUT");
+-  if(injectPath) {
+-    if(FILE* fp = fopen(injectPath, "r")) {
+-      unsigned buttons = 0; int sx = 0, sy = 0;
+-      if(fscanf(fp, "%x %d %d", &buttons, &sx, &sy) >= 1) {
+-        if(buttons || sx || sy) {
+-          static u32 lastLogged = ~0u;
+-          if(buttons != lastLogged) {
+-            printf("TESTHARNESS inject buttons=%08x stick=%d,%d\n", buttons, sx, sy);
+-            fflush(stdout);
+-            lastLogged = buttons;
+-          }
+-        }
+-        data = data | buttons;
+-        if(sx || sy) {
+-          data.byte(0) = s8(sy);
+-          data.byte(1) = s8(sx);
+-        }
+-      }
+-      fclose(fp);
+-    }
+-  }
+-
+   return data;
+diff --git a/ares/n64/pif/hle.cpp b/ares/n64/pif/hle.cpp
+--- a/ares/n64/pif/hle.cpp
++++ b/ares/n64/pif/hle.cpp
+@@ -121,6 +121,17 @@ auto PIF::joyRun() -> void {
+   static constexpr bool Debug = 0;
+ 
++  static const char* inject[] = {getenv("ARES_TEST_INPUT"), getenv("ARES_TEST_INPUT_2")};
++  static FILE* samples = []() -> FILE* {
++    const char* path = getenv("TR64_ARES_SAMPLE_LOG");
++    FILE* file = path ? fopen(path, "a") : nullptr;
++    if(file) {
++      fputs("TR64 sampled ares " TR64_ARES_IDENTITY "\n", file);
++      fflush(file);
++    }
++    return file;
++  }();
++
+   ControllerPort* controllers[4] = {
+     &controllerPort1,
+     &controllerPort2,
+     &controllerPort3,
+@@ -170,11 +181,37 @@
+       over = status.bit(1);
+     }
+ 
++    // Only a full gamepad poll can consume a numbered test input.
++    unsigned long long entry = 0;
++    if(valid && channel < 2 && send == 1 && recv == 4 && input[0] == 1 &&
++       controllers[channel]->device->node->name() == "Gamepad" && inject[channel]) {
++      if(FILE* fp = fopen(inject[channel], "r")) {
++        unsigned buttons = 0;
++        int x = 0, y = 0;
++        if(fscanf(fp, "%x %d %d %llu", &buttons, &x, &y, &entry) == 4) {
++          output[0] = (unsigned)output[0] | (buttons >> 24);
++          output[1] = (unsigned)output[1] | (buttons >> 16 & 255);
++          if(x || y) {
++            output[2] = (u8)x;
++            output[3] = (u8)y;
++          }
++        }
++        fclose(fp);
++      }
++    }
+     if(!valid) ram.write<Byte>(recvOffset, 0x80 | recv);
+     if(over)   ram.write<Byte>(recvOffset, 0x40 | recv);
+     if (valid) {
+       for(u32 index : range(recv)) {
+         ram.write<Byte>(offset++, output[index]);
+       }
+     }
++    static unsigned long long returned[2] = {};
++    if(samples && entry && entry != returned[channel]) {
++      fprintf(samples, "TESTHARNESS pad-sampled port=%d entry=%llu buttons=%02x%02x0000 stick=%d,%d ns=%llu\n",
++        (int)channel + 1, entry, (unsigned)output[0], (unsigned)output[1],
++        (int)(s8)(u8)output[2], (int)(s8)(u8)output[3], (unsigned long long)nall::chrono::nanosecond());
++      fflush(samples);
++      returned[channel] = entry;
++    }
+   }

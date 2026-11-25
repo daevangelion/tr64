@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Actual Core/game/renderer lifecycle; no alternate simulation or fake loader.
+scene inventory-transition
+start boot
+load level level1
+probe reload
+ticks 2
+seed 1
+observe log "^inventory-transition PASS loads=5 slots=26 invalid_counts=26 quest_preserved=1 ten_a_weapons_reset=1 fresh_reset=1$"
+observe pools
+observe placement

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# First75 ticks of the existing LEVEL1 forward route, with real game audio.
+scene snd-level1-run
+start boot
+load level level1
+game
+ticks 75
+seed 1
+at 0 pad 8 0 0
+observe log "(?s)audio: ticks=75 events=[1-9][0-9]* played=[1-9][0-9]* dropped=0 unavailable=0 underruns=0 clipped=0 .*?audio-output: .*? underruns=0"
+observe pools
+observe placement

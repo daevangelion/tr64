@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT
+# Real LEVEL3A waterfall80 emitter; room1 sector measured from both source files.
+scene snd-waterfall
+start boot
+load level level3a
+game
+place 1 37376 -256 76288 0
+ticks 120
+seed 1
+at 0 pad 0 0 0
+observe log "(?s)(?=.*audio: ticks=120 events=[0-9]+ played=[1-9][0-9]* dropped=0 unavailable=0 underruns=0 clipped=0 )(?=.*audio-ambient: sources=10 started=[1-9][0-9]* stopped=[0-9]+)(?=.*audio: ticks=120 .*?audio-output: .*? underruns=0)"
+observe pools
+observe placement

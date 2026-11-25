@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+scene level-load-psx
+start boot
+load level level1
+ticks 8
+seed 1
+observe level-load psx
+observe pools
+observe placement
+at 0 pad 0 0 0

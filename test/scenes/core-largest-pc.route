@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+scene level-load-largest-pc
+start boot
+load level level10c
+ticks 8
+seed 1
+observe level-load pc
+observe pools
+observe placement
+at 0 pad 0 0 0
