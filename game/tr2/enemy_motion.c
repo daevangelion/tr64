@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA; src/fixed/enemy.h and item.h at 2333adef30ae2a5f3b32c5355e6e343d6aa0531a. */
 #include "creature.h"
-#include "../weapon.h"
-#include "../enemy.h"
+#include "game/common/weapon.h"
+#include "game/common/enemy.h"
 
 /* tr2-great-wall-creatures, Collision after the creature turns. */
 static const Sector *sectorAt(Room **room,const vec3i *pos, int32 y)

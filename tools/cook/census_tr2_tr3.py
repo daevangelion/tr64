@@ -111,7 +111,7 @@ def game_state(level, game):
     sectors = sum(len(room.sectors) for room in level.rooms)
     nmodel = (191,265,374)[game-1]
     item_stride, model_stride = (76,8) if game == 1 else (80,10)
-    # Target-sized allocation terms from the 32-bit ABI and game/game.c:235–238.
+    # Target-sized allocation terms from the 32-bit ABI and game/common/game.c:235–238.
     tables = dict(fixed_game=8392, room_bindings=16*rooms, mutable_sectors=8*sectors,
                   items=align(max(256,items)*item_stride,4), models=align(nmodel*model_stride,4),
                   navigation=9*8*boxes, camera_flags=align(2*len(data['cameras']),4),

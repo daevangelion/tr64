@@ -3,7 +3,7 @@
 /* Tomb Raider II Opera House traps and mechanisms (docs/specs/wall/tr2-opera-house.md §§3-8),
  * paged in the `tr2_opera` code unit. */
 #include "objects.h"
-#include "../object.h"
+#include "game/common/object.h"
 
 #if TR64_HAS_TR2
 

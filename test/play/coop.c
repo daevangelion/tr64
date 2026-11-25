@@ -12,7 +12,7 @@
 #include "tr64/level.h"
 #include "tr64/render.h"
 #include "tr64/game.h"
-#include "game/internal.h"
+#include "game/common/internal.h"
 
 static uint32_t epoch,tick;
 static int active;

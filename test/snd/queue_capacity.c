@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: MIT */
 /* Directed test of TR2 sound queue compaction against an unlimited reference
- * queue, linked with real game/sound.c and real engine/snd/snd.c. */
+ * queue, linked with real game/common/sound.c and real engine/snd/snd.c. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "engine/snd/snd.h"
 #include "engine/snd/format.h"
 #include "engine/core/sys.h"

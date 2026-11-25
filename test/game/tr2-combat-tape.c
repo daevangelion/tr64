@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* Test-only link wrapper: drive weapon inputs, never arm state or counters. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static FILE *tape;

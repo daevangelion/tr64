@@ -2,7 +2,7 @@
 /* Plant a surface probe the level does not contain. TR64_CLIMB_CASE is
  * comma-separated key=value: h, type, yaw, weapon (free|flare|ready),
  * slant, side, ceiling, floor=wall, action=0. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdlib.h>
 
 void __real_ItemObj_collideRoom(const ItemObj *self, int32 height, int32 offset);

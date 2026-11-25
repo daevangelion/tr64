@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Link only game/tr2/nav.c. The oversized backing arrays keep
  * the rejected v2 reads observable without accessing unowned memory. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static GameState state;

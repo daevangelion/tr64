@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Directed test link. The no-target and repress routes have no creature,
  * so they cannot gain or lose a lock. Not a game rule. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdlib.h>
 void tr64_shotgun_test_arm(ExtraInfoLara *e, bool action)
 {

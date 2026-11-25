@@ -3,7 +3,7 @@
  * game without a slot the player confirmed in the picker for that request.
  *
  * Where the game acts. Inside one game tick, inventory update runs onItem in
- * state SHOW only (game/inventory.c, Inventory_update): the option cursor moves
+ * state SHOW only (game/common/inventory.c, Inventory_update): the option cursor moves
  * on a direction *edge*, the passport page changes on a LEFT/RIGHT edge, and
  * only then an ACTION edge is read against the cursor and page the tick
  * has just produced; the game's single save call and its LOAD transition hang

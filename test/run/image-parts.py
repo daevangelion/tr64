@@ -28,7 +28,7 @@ COMPONENTS = [
     ("SDK: newlib, libgcc, crt", r"^lib(c|m|gcc)\.a|^crt"),
     ("audio", r"^engine/snd/|^plat/n64/audio\.o$"),
     ("renderer", r"^engine/render/|^plat/n64/(gpu|surfaces)\.o$"),
-    ("front end (UI, menus, save)", r"^engine/ui/|^engine/save/|^plat/n64/ui|^game/(frontend|menu_text|save_world)\.o$"),
+    ("front end (UI, menus, save)", r"^engine/ui/|^engine/save/|^plat/n64/ui|^game/common/(frontend|menu_text|save_world)\.o$"),
     ("diagnostics (fatal screen, QR, unwinder, formatter, log)",
      r"^plat/n64/(fatal|fmt-sdk)|^engine/core/(qr|unwind|fmt|log)\.o$"),
     ("scene and test machinery in the build", r"^engine/test/"),

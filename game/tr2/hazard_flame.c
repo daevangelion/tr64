@@ -2,7 +2,7 @@
 /* Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA; src/fixed/item.h at 2333adef30ae2a5f3b32c5355e6e343d6aa0531a. */
 #include "objects.h"
 
-#include "../object.h"
+#include "game/common/object.h"
 
 /* tr2-items-general, Campfire: the range is a horizontal disk plus
  * vertical range and animated pose, not a sphere or same-room test. */

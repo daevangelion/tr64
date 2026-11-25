@@ -820,7 +820,7 @@ void tr3_test_triggers(tr3_state_t *st, uint16_t room, int32_t x, int32_t y, int
 }
 
 /* Shared TR1-TR3 room/sector adapter backed by TR3 split-triangle floor engine. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 
 static Sector tr3_sec_scratch[4];
 static uint16_t tr3_sec_room[4];

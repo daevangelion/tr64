@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 /* Exercise the real Core-backed restore helper with the loader's header-first
  * ordering. No cloned entities, fake Core, or derived-state save snapshot. */
-#include "game/internal.h"
-#include "game/save_world.h"
+#include "game/common/internal.h"
+#include "game/common/save_world.h"
 #include "tr64/engine.h"
 #include "tr64/eng.h"
 #include "tr64/render.h"

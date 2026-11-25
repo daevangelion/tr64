@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* Link the real arm, RNG and pose functions with section GC. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static void expect(bool pass, const char *why)

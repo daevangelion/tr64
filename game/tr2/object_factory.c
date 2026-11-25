@@ -5,7 +5,7 @@
  * Keeps source constructor order and both deterministic RNG streams. */
 #include "objects.h"
 #include "boat.h"
-#include "../object.h"
+#include "game/common/object.h"
 
 bool game_tr2_creature_type(unsigned type)
 {

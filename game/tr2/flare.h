@@ -3,7 +3,7 @@
 #ifndef TR64_GAME_TR2_FLARE_H
 #define TR64_GAME_TR2_FLARE_H
 
-#include "../internal.h"
+#include "game/common/internal.h"
 
 enum { FLARE_BURN_END = 1800 };
 enum { PISTOL_AIM_END = 4, PISTOL_DRAW_START = 5, PISTOL_UNHOLSTER = 13,

@@ -3,7 +3,7 @@
 #include "creature.h"
 #include "objects.h"
 
-#include "../enemy.h"
+#include "game/common/enemy.h"
 
 /* tr2-great-wall-creatures: Creature rules, Admission outcomes, Mood
  * transitions, Tiger, Small and giant spiders, Crow. */

@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: MIT */
-/* Link game/animation.c with section GC: stored tails, shortened divisor,
+/* Link game/common/animation.c with section GC: stored tails, shortened divisor,
  * retained out-of-clip destinations and packed storage bounds. */
 #include <stdarg.h>
 #include <stdio.h>
-#include "game/internal.h"
+#include "game/common/internal.h"
 
 GameState *gs;
 

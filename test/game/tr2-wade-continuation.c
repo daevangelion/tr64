@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* Link normal host objects except plat/host/main.o, with --wrap=ItemObj_collideRoom. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static unsigned errors, frontQueries;

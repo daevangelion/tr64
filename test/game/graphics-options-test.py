@@ -550,8 +550,8 @@ PROBE_C = r'''/* SPDX-License-Identifier: MIT */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "game/internal.h"
-#include "game/inventory-private.h"
+#include "game/common/internal.h"
+#include "game/common/inventory-private.h"
 #include "tr64/game.h"
 #include "tr64/code.h"
 #include "tr64/level.h"
@@ -761,8 +761,8 @@ TR1_MENU_PROBE_C = r'''/* SPDX-License-Identifier: MIT */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "game/internal.h"
-#include "game/inventory-private.h"
+#include "game/common/internal.h"
+#include "game/common/inventory-private.h"
 #include "tr64/game.h"
 #include "tr64/io.h"
 #include "tr64/level.h"

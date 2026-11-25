@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Merge review control: run door-closed and force only the accepted tick-14
  * push's destination room. Check the two creature visits before any footer. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static Room *start, *adjacent;

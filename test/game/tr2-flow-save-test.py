@@ -72,10 +72,10 @@ DRIVER_C = r'''/* SPDX-License-Identifier: MIT */
 #include "engine/ui/format.h"
 #include "engine/ui/frontend.h"
 #include "engine/ui/ui.h"
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "game/tr2/objects.h"
 #include "game/tr2/boat.h"
-#include "game/object.h"
+#include "game/common/object.h"
 
 extern void tr64_snd_boot(void) __attribute__((weak));
 extern void tr64_snd_level_start(const tr64_level_t *) __attribute__((weak));

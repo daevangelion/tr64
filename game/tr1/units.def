@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA; src/fixed/enemy.h, object.h, inventory.h and save_v3.h at 2333adef30ae2a5f3b32c5355e6e343d6aa0531a.
+objects *game/tr1/object_dispatch.o *game/tr1/object_interact.o *game/common/object_block.o *game/common/object_trap.o *game/tr1/object_progression.o *game/tr1/hazard_dispatch.o *game/tr1/hazard_boulder.o *game/tr1/hazard_contact.o *game/tr1/hazard_thor_lightning.o *game/tr1/hazard_flame.o
+enemy_peru *game/tr1/unit_peru.o *game/tr1/enemy_wolf.o *game/tr1/enemy_bear.o *game/tr1/enemy_bat.o
+enemy_greece *game/tr1/unit_greece.o *game/tr1/enemy_crocodile.o *game/tr1/enemy_lion.o *game/tr1/enemy_gorilla.o
+enemy_rat *game/tr1/enemy_rat.o
+enemy_dinosaurs *game/tr1/unit_dinosaurs.o *game/tr1/enemy_rex.o *game/tr1/enemy_raptor.o
+enemy_mutant *game/tr1/enemy_mutant.o
+enemy_atlanteans *game/tr1/unit_atlanteans.o *game/tr1/enemy_centaur.o *game/tr1/enemy_mummy.o
+enemy_gunmen *game/tr1/unit_gunmen.o *game/tr1/enemy_larson.o *game/tr1/enemy_pierre.o
+enemy_henchmen *game/tr1/unit_henchmen.o *game/tr1/enemy_skater.o *game/tr1/enemy_cowboy.o *game/tr1/enemy_mrt.o
+enemy_natla *game/tr1/enemy_natla.o
+enemy_adam *game/tr1/enemy_adam.o
+enemy_doppelganger *game/tr1/enemy_doppelganger.o
+enemy_encounter *game/tr1/enemy_encounter.o
+inv *game/common/inventory.o *game/common/inventory-view.o
+save *game/common/save.o

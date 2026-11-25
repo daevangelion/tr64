@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Exercise the production pass with a cooked room-3 portal sequence
  * of 33, 0, 33. Observe the visits, not a second room-walk algorithm. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static ItemObj *probes[6];

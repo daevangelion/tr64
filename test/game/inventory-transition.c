@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Real Core/game/renderer release and restart through the normal engine build. */
 #include <string.h>
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "tr64/eng.h"
 #include "tr64/render.h"
 #include "tr64/code.h"

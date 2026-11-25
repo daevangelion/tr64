@@ -8,7 +8,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "game/tr3/tr3.h"
 #include "tr64/mem.h"
 #include "engine/core/sys.h"

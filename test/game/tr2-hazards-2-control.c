@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Directed checks for the Great Wall disc, blade and spike wall, and the
  * wrong variants those checks reject. Harness-only link. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Test-only link wrapper. Exercise actual activation and shot allocations;
  * no gameplay outputs are supplied to a replay. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 void __real_game_tr2_tick(uint32 mask);

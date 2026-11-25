@@ -38,7 +38,7 @@ PROBE_C = r'''/* SPDX-License-Identifier: MIT */
 #include <stdlib.h>
 #include <string.h>
 #include "tr64/game.h"
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "ui_string_ids.h"
 
 extern void __real_game_tick_players(const uint16_t input_mask[TR64_GAME_PLAYERS]);

@@ -3,8 +3,8 @@
 /* Tomb Raider II mid-level persistent state serializer/deserializer, paged in
  * the `save` code unit. Behavioural contract: docs/specs/wall/tr2-death-save-and-finish.md §4.
  * Big-endian wire encoding; zero C struct padding, pointers, or RNG state. */
-#include "../internal.h"
-#include "../save.h"
+#include "game/common/internal.h"
+#include "game/common/save.h"
 #include "objects.h"
 #include "tr64/res.h"
 

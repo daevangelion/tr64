@@ -6,7 +6,7 @@
 #include "objects.h"
 #include "boat.h"
 #include "enemy_urban.h"
-#include "../object.h"
+#include "game/common/object.h"
 #include "tr64/code.h"
 
 static bool wallUnitType(unsigned type)

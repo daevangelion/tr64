@@ -64,7 +64,7 @@ COMMON := -I. -Iinclude -I$(BUILD_DIR)/generated -ffp-contract=off -fno-fast-mat
 ROM := $(BUILD_DIR)/tr64.z64
 ELF := $(BUILD_DIR)/tr64.elf
 GEN := $(BUILD_DIR)/generated
--include $(sort $(wildcard engine/*/module.mk plat/*/module.mk) $(if $(filter 3,$(TR64_GAME)),game/tr3/module.mk,game/module.mk))
+-include $(sort $(wildcard engine/*/module.mk plat/*/module.mk) game/module.mk)
 TR64_HOST_CODE_UNIT_FRAGMENTS := $(TR64_CODE_UNIT_FRAGMENTS) $(if $(filter 3,$(TR64_GAME)),$(TR64_TR3_CODE_UNIT_FRAGMENTS),$(TR64_TR1_CODE_UNIT_FRAGMENTS) $(TR64_TR2_CODE_UNIT_FRAGMENTS))
 ifeq ($(TR64_GAME),1)
 TR64_CODE_UNIT_FRAGMENTS += $(TR64_TR1_CODE_UNIT_FRAGMENTS)

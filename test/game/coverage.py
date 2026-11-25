@@ -113,7 +113,7 @@ def main():
     r.add_argument('--jobs', type=int, default=3)
     r.add_argument('--schema', default='4', help='trace schema the host is asked for (4 also runs the world hashes)')
     r.add_argument('--saves', action='store_true', help='also run each script with a real save and load at 1/3, 2/3 and 30 ticks before the end')
-    r.add_argument('--trace', action='store_true', help='also write the trace (to /dev/null): the schema writers of game/trace.c run only then')
+    r.add_argument('--trace', action='store_true', help='also write the trace (to /dev/null): the schema writers of game/common/trace.c run only then')
     q = sub.add_parser('report')
     q.add_argument('--objdir', required=True)
     q.add_argument('--source', default='game')

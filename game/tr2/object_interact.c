@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA; src/fixed/object.h at 2333adef30ae2a5f3b32c5355e6e343d6aa0531a (reach and alignment primitives). */
 #include "objects.h"
-#include "../object.h"
+#include "game/common/object.h"
 
 /* Both cases use a level or pitched frame with no roll. Rotate the world
  * delta with the inverse of its Y-X orientation, rounding at Q14. */

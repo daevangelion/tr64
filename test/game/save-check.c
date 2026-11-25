@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Original production-API source-save regression; no whole-state snapshot. */
-#include "game/internal.h"
-#include "game/save.h"
+#include "game/common/internal.h"
+#include "game/common/save.h"
 #include "tr64/res.h"
 #include <string.h>
 extern uint32_t game_save(void *, uint32_t);

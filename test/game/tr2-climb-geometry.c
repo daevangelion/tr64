@@ -4,7 +4,7 @@
  * and -Wl,--gc-sections. Authored side exits use the movement replay. */
 #include <stdarg.h>
 #include <stdio.h>
-#include "game/lara.c"
+#include "game/common/lara.c"
 
 static GameState state;
 GameState *gs = &state;

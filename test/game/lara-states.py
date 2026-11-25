@@ -19,7 +19,7 @@ LEVELS = 'gym level1 level2 level3a level3b level4 level5 level6 level7a level7b
 
 
 def main():
-    names = dict((int(v), k) for k, v in re.findall(r'Lara_STATE_([A-Z_0-9]+) = (\d+)', open('game/internal.h').read()))
+    names = dict((int(v), k) for k, v in re.findall(r'Lara_STATE_([A-Z_0-9]+) = (\d+)', open('game/common/internal.h').read()))
     seen = {}
     for level in LEVELS:
         lv = src_pc.load(f'/tmp/tr64/data/pc/{level}.phd')

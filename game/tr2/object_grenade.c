@@ -4,7 +4,7 @@
  * paged in `tr2_wall` so it is available in every level where Lara owns the launcher. */
 #include "objects.h"
 #include "boat.h"
-#include "../object.h"
+#include "game/common/object.h"
 
 #if TR64_HAS_TR2
 

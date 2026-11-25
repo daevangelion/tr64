@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA; src/fixed/item.h at 2333adef30ae2a5f3b32c5355e6e343d6aa0531a. */
 #include "objects.h"
-#include "../object.h"
+#include "game/common/object.h"
 
 
 /* Great Wall boulders: the admitted release-free route exercises the

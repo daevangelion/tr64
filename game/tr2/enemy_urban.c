@@ -3,7 +3,7 @@
 #include "enemy_urban.h"
 #include "boat.h"
 #include "objects.h"
-#include "../object.h"
+#include "game/common/object.h"
 
 #if TR64_HAS_TR2
 

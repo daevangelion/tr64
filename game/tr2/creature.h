@@ -3,7 +3,7 @@
 #ifndef TR64_GAME_TR2_CREATURE_H
 #define TR64_GAME_TR2_CREATURE_H
 
-#include "../internal.h"
+#include "game/common/internal.h"
 
 enum { BORED, ATTACK, ESCAPE, STALK };
 typedef struct { uint64_t distance; int16 yaw; int16 box; bool sameZone, ahead, facing; } Interest;

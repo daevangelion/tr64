@@ -200,7 +200,7 @@ def verify_picture(label, picture, reference, solo=None, world=None, *, hud=None
         require(all(w < s for w, s in zip(errors, solo_errors, strict=True)),
                 f"{label}: a half is not closer to the split projection than to the plain one-view render")
     if label in ("ring", "both-dead"):
-        # game/menu_text.c places the title at y=20 and selected label at
+        # game/common/menu_text.c places the title at y=20 and selected label at
         # y=232. Check the warm foreground of the host glyphs, not the
         # background, at the full-screen coordinates. Missing or half-view
         # menu text cannot hide behind mostly unchanged world pixels.

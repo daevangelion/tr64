@@ -39,8 +39,8 @@ snd-ambient-test: snd-test $(BUILD_DIR)/snd-mixer-test
 .PHONY: snd-stereo-test
 snd-stereo-test: snd-test $(BUILD_DIR)/snd-mixer-test
 	rtk env PYTHONPATH=tools/cook $(PYTHON) test/snd/test_stereo.py --harness $(BUILD_DIR)/snd-mixer-test --fixtures $(BUILD_DIR)/snd-native --out $(BUILD_DIR)/snd-stereo
-SND_QUEUE_SOURCES := test/snd/queue_capacity.c game/sound.c game/math.c game/tables.c $(filter-out test/snd/mixer.c,$(SND_MIXER_SOURCES))
-$(BUILD_DIR)/snd-queue-test: $(SND_QUEUE_SOURCES) game/internal.h engine/snd/snd.h engine/snd/format.h $(GEN)/core_schema.h
+SND_QUEUE_SOURCES := test/snd/queue_capacity.c game/common/sound.c game/common/math.c game/common/tables.c $(filter-out test/snd/mixer.c,$(SND_MIXER_SOURCES))
+$(BUILD_DIR)/snd-queue-test: $(SND_QUEUE_SOURCES) game/common/internal.h engine/snd/snd.h engine/snd/format.h $(GEN)/core_schema.h
 	@rtk mkdir -p $(dir $@)
 	rtk $(HOST_CC) -m32 -std=c99 -O2 $(WARN) -I. -Iinclude -I$(GEN) -DTR64_GAME=2 -DTR64_HOST=1 $(SND_QUEUE_SOURCES) -Wl,--wrap=game_sound_events -o $@
 .PHONY: snd-queue-test

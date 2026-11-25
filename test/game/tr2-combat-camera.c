@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* Link to the normal host build objects except plat/host/main.o. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static void expect(bool condition,const char *message)

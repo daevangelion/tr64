@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* The slot picker against a transliteration of the game's passport tick
- * (game/inventory.c Inventory_update SHOW/READY/SELECT, onOption, onPassport,
- * actionHint, saveResult; game/game.c game_tick's LOAD stop), the real picker,
+ * (game/common/inventory.c Inventory_update SHOW/READY/SELECT, onOption, onPassport,
+ * actionHint, saveResult; game/common/game.c game_tick's LOAD stop), the real picker,
  * the real save glue and the real medium over a RAM device. Invariants over
  * exhaustive short and many random input sequences: a save reaches the medium
  * only for the slot the player accepted in the picker for that request, a LOAD
@@ -58,7 +58,7 @@ int game_load(const void *buffer,uint32_t bytes) { (void)buffer;(void)bytes;retu
 int game_stats_view(tr64_game_level_stats_t *out) { memset(out,0,sizeof(*out));out->titleID=7;return 1; }
 const tr64_game_settings_t *game_settings_view(void) { static const tr64_game_settings_t s={0}; return &s; }
 int game_settings_apply(const tr64_game_settings_t *s) { (void)s;return 1; }
-/* ---- the passport, as game/inventory.c runs it ---- */
+/* ---- the passport, as game/common/inventory.c runs it ---- */
 enum { LVL_NONE=-1,LVL_L1=1,LVL_L2=2,LVL_LOAD=100,LVL_TITLE=0 };
 enum { PP_LOAD=0,PP_SAVE=1,PP_EXIT=2 };
 enum { OPT_BUTTON=1,OPT_SPACE=0 };

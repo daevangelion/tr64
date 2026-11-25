@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Link a host with --wrap=ItemObj_collideRoom to control the otherwise
  * unrecorded middle-floor rise and flat frontal splat outcomes. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 
 void __real_ItemObj_collideRoom(const ItemObj *, int32, int32);
 

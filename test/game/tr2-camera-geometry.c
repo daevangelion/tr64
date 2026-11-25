@@ -4,10 +4,10 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include "game/camera.c"
-#include "game/camera_tick.c"
-#include "game/trigger.c"
-#include "game/view.c"
+#include "game/common/camera.c"
+#include "game/common/camera_tick.c"
+#include "game/common/trigger.c"
+#include "game/common/view.c"
 
 #ifdef FROZEN_V2
 #define game_tr2_bearing phd_atan

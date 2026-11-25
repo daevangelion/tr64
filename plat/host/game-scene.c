@@ -7,9 +7,9 @@
 #include <limits.h>
 #include "tr64/game.h"
 #include "tr64/pack.h"
-#include "game/tr2.h"
+#include "game/tr2/tr2.h"
 #if TR64_HAS_TR2
-#include "game/internal.h"
+#include "game/common/internal.h"
 #endif
 #include "tr64/level.h"
 #include "tr64/engine.h"

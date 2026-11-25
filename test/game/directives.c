@@ -9,7 +9,7 @@
  * field TIMER). Paths reached through
  * them are placed-state evidence, not play-reached evidence. */
 #ifdef TR64_HOST
-#include "game/internal.h"
+#include "game/common/internal.h"
 
 int tr64_game_test_give(int32_t type, int32_t count)
 {

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /* Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA; src/fixed/object.h at 2333adef30ae2a5f3b32c5355e6e343d6aa0531a. */
 #include "objects.h"
-#include "../object.h"
+#include "game/common/object.h"
 
 /* Great Wall objects, Discs: I's dart emitter is the peer. The cited
  * differences are the latched firing loop, the exact-east spawn exception,

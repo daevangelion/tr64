@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Directed host presentation & rendering probe for TR2 room effects, muzzle flashes,
  * flare flame & dynamic lighting, creature head tracking, and Lara's 6-segment braid. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "tr64/game.h"
 #include "tr64/code.h"
 #include "tr64/level.h"

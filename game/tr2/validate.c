@@ -2,7 +2,7 @@
 /* Derived from OpenLara (c) 2018 Timur "XProger" Gagiev; see game/LICENSE-OPENLARA; src/fixed/item.h at 2333adef30ae2a5f3b32c5355e6e343d6aa0531a. */
 #include "flare.h"
 #include "objects.h"
-#include "../object.h"
+#include "game/common/object.h"
 #include "tr64/mem.h"
 
 static void validatePackedPose(PackedFrame key, unsigned clip, unsigned frame, unsigned joints)

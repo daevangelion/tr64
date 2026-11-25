@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* Directed presentation check. Not part of a sealed comparison. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "tr64/game.h"
 #include <stdio.h>
 

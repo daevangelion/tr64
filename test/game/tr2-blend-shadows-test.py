@@ -488,7 +488,7 @@ int main(void)
 '''
 
 PROBE_C = r'''/* SPDX-License-Identifier: MIT */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "tr64/game.h"
 #include "tr64/gpu.h"
 #include "tr64/code.h"

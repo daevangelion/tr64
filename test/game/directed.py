@@ -37,7 +37,7 @@ DATA = Path('/tmp/tr64/data/pc')
 NONE, LEFT, RIGHT, FORWARD, BACK, JUMP, WALK, ACTION, WEAPON, LOOK, SELECT = 0, 2, 4, 8, 16, 32, 64, 128, 256, 512, 2048
 ROLL = FORWARD | BACK
 
-# Inventory slots and item types (game/internal.h).
+# Inventory slots and item types (game/common/internal.h).
 SLOT = dict(leadbar=0, key1=1, key2=2, key3=3, key4=4, puzzle4=5, puzzle3=6, puzzle2=7, puzzle1=8,
             scion=9, compass=10, pistols=11, shotgun=13, magnums=15, uzis=17,
             medi_big=19, medi_small=20)

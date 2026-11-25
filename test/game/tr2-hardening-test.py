@@ -23,17 +23,17 @@ TEST = WT / "test/game/tr2-hardening.c"
 # a712dc4 no longer demonstrates that overflow. Both trees must visit
 # room 160 without a fault. The named capacity refusal is separate.
 CASES = [
-    ("rooms", ["game/collision.c"], False),
-    ("capacity", ["game/collision.c"], False),
-    ("links", ["game/animation.c"], True),
-    ("state", ["game/animation.c"], True),
-    ("sound", ["game/animation.c"], True),
-    ("zip", ["game/animation.c"], True),
+    ("rooms", ["game/common/collision.c"], False),
+    ("capacity", ["game/common/collision.c"], False),
+    ("links", ["game/common/animation.c"], True),
+    ("state", ["game/common/animation.c"], True),
+    ("sound", ["game/common/animation.c"], True),
+    ("zip", ["game/common/animation.c"], True),
     ("tiger", ["game/tr2/enemy_tiger.c"], True),
     ("crow", ["game/tr2/enemy_crow.c"], True),
     ("spider", ["game/tr2/enemy_small_spider.c"], True),
     ("boulder", ["game/tr2/hazard_boulder.c"], False),
-    ("harness", ["game/room.c"], True),
+    ("harness", ["game/common/room.c"], True),
 ]
 
 

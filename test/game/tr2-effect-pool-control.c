@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Test-only link wrapper. Exercise the real allocator and breakup with
  * 0 or 3 slots available at the first spider's death. Never seal a trace. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 void __real_game_tr2_spider_breakup(ItemObj *);

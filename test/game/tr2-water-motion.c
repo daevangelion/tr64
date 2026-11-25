@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-/* Link game/lara.c with section GC to exercise the actual host water helpers. */
-#include "game/internal.h"
+/* Link game/common/lara.c with section GC to exercise the actual host water helpers. */
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static void expect(bool condition, const char *message)

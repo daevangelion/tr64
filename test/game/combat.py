@@ -146,7 +146,7 @@ def fire_script(env, start, give, weapon, pattern, index):
 
 
 SETTLE = {30: 200}
-MIRROR = {6: (36864, 60416)}   # ROOM_CENTER_X, ROOM_CENTER_Z of game/enemy.h
+MIRROR = {6: (36864, 60416)}   # ROOM_CENTER_X, ROOM_CENTER_Z of game/common/enemy.h
 PATTERNS = ('stand', 'strafe', 'retreat', 'holster')
 
 

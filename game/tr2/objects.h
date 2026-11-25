@@ -6,7 +6,7 @@
 #ifndef TR64_GAME_TR2_OBJECTS_H
 #define TR64_GAME_TR2_OBJECTS_H
 
-#include "../internal.h"
+#include "game/common/internal.h"
 
 #if TR64_HAS_SEQUEL
 /* tr2-triggers-and-interaction, Reach and commitment; WALL.TR2 body clips. */

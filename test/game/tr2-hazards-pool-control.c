@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Run production spike-jump and boulder-hit with and without free effect
  * slots just before the fatal contact. These are harness-only links. */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include <stdio.h>
 
 static bool collect;

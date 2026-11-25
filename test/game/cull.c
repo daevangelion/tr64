@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "game/internal.h"
-#include "game/cull.h"
+#include "game/common/internal.h"
+#include "game/common/cull.h"
 #include "engine/render/internal.h"
 #include "tr64/eng.h"
 #include "tr64/mem.h"

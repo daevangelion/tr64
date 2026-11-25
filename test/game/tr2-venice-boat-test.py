@@ -100,7 +100,7 @@ def sector_digest(room_sectors):
 
 
 def door_refs(rooms, room_sectors, floor_data, item, flipped):
-    """Mirror game/world.c tr2DoorRefs for a Venice ordinary door."""
+    """Mirror game/common/world.c tr2DoorRefs for a Venice ordinary door."""
     n = len(rooms)
     mate = [255] * n
     alternate = [False] * n
@@ -175,7 +175,7 @@ def close_sector(s):
 
 
 def verify_lock_flip_apply_refs(host, base, spawn_sector, root):
-    """Positive + negative control for game/world.c applyRefs room->source fix."""
+    """Positive + negative control for game/common/world.c applyRefs room->source fix."""
     rooms = rows(base, 'rooms')
     secs = rows(base, 'sectors')
     items = rows(base, 'items')

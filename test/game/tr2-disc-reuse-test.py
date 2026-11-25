@@ -27,9 +27,9 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 
 CONTROL_C = r'''/* SPDX-License-Identifier: MIT */
-#include "game/internal.h"
+#include "game/common/internal.h"
 #include "game/tr2/objects.h"
-#include "game/save_world.h"
+#include "game/common/save_world.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -228,8 +228,8 @@ def main():
 
     # 2. Negative control A: remove ItemObj_resetSlot(self) from ItemObj_add() and
     #    idempotency guard from ItemObj_activateBase() -> dirty-free MUST fail.
-    game_src = (ROOT / 'game/game.c').read_text()
-    item_src = (ROOT / 'game/item.c').read_text()
+    game_src = (ROOT / 'game/common/game.c').read_text()
+    item_src = (ROOT / 'game/common/item.c').read_text()
 
     old_add = '    gs->firstFree = self->nextItem;\n    ItemObj_resetSlot(self);\n'
     new_add = '    gs->firstFree = self->nextItem;\n'
@@ -249,8 +249,8 @@ def main():
     compile_obj(build, mut_item_a_c, mut_item_a_o)
 
     mut_a = link_host(build, scratch, 'host-mut-a', control_o, {
-        'game/game.o': mut_game_o,
-        'game/item.o': mut_item_a_o,
+        'game/common/game.o': mut_game_o,
+        'game/common/item.o': mut_item_a_o,
     })
     rc, timed_out, _ = run_case(mut_a, rbc_path, scratch / 'mut-a.ppm', 'dirty-free', expect_pass=False)
     print(f'PASS negative-control-A (dirty-free rejected: rc={rc}, timeout={timed_out})')
@@ -267,7 +267,7 @@ def main():
     compile_obj(build, mut_item_b_c, mut_item_b_o)
 
     mut_b = link_host(build, scratch, 'host-mut-b', control_o, {
-        'game/item.o': mut_item_b_o,
+        'game/common/item.o': mut_item_b_o,
     })
     rc, timed_out, _ = run_case(mut_b, rbc_path, scratch / 'mut-b.ppm', 'spider-placed', expect_pass=False)
     print(f'PASS negative-control-B (spider-placed rejected: rc={rc}, timeout={timed_out})')

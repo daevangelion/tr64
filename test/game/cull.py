@@ -31,7 +31,7 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     command = ['rtk', 'make', 'host', f'BUILD_DIR={args.build_dir.resolve()}',
                f'TR64_LEVEL_PACK={args.pack.resolve()}',
-               'TR64_SCENE_TEST_SOURCES=$(filter-out $(TR64_ENGINE_SOURCES),game/cull.c test/game/cull.c)']
+               'TR64_SCENE_TEST_SOURCES=$(filter-out $(TR64_ENGINE_SOURCES),game/common/cull.c test/game/cull.c)']
     build = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=300)
     (args.out/'build.log').write_bytes(build.stdout)
     if build.returncode:
