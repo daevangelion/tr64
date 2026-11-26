@@ -19,8 +19,8 @@ python3 tools/build.py --input "/path/to/Tomb Raider (I|II|III)" --out tr64.z64
 ```
 
 ### Technical Reference
-For engine internals and contributor rules, see [docs/architecture.md](docs/architecture.md),
-[docs/PROVENANCE.md](docs/PROVENANCE.md), and [AGENTS.md](AGENTS.md).
+For engine design, budgets, and contributor rules, see [docs/architecture.md](docs/architecture.md),
+[docs/evidence.md](docs/evidence.md), [docs/PROVENANCE.md](docs/PROVENANCE.md), and [AGENTS.md](AGENTS.md).
 
 No Tomb Raider data is in this repository, and none is built into anything
 you can download from it. You need your own copy of the game.
